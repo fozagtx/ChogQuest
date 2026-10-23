@@ -21,6 +21,9 @@ export const CHRONICLE = {
   deployBlock: 73_415_961,
 } as const
 
+/** IPFS gateway for Chog metadata and art. ipfs.io and dweb.link stopped serving direct requests. */
+export const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/"
+
 export const TELEGRAM = {
   /** The bot's @username without the @. Empty until the bot is created; the app hides Telegram links then. */
   botUsername: "",

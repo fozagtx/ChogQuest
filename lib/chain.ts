@@ -2,6 +2,7 @@ import "server-only"
 
 import { createPublicClient, decodeEventLog, getAddress, http, parseAbi, type Address, type Hex } from "viem"
 
+import { IPFS_GATEWAY } from "@/lib/config"
 import { env } from "@/lib/env"
 
 const erc721Abi = parseAbi([
@@ -99,6 +100,7 @@ export async function chogsOfOwner(address: string): Promise<number[] | null> {
 }
 
 const MAX_SCAN = 5000
+const SCAN_BATCH = 400
 // Canonical Multicall3, deployed on Monad. Passed explicitly because the clients have no chain config.
 const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11"
 
@@ -108,19 +110,26 @@ async function scanOwners(owner: Address): Promise<number[] | null> {
   try {
     const supply = await client.readContract({ address: env.chogNftAddress, abi: erc721Abi, functionName: "totalSupply" })
     const ids = Array.from({ length: Math.min(Number(supply), MAX_SCAN) + 1 }, (_, i) => i)
-    const owners = await client.multicall({
-      multicallAddress: MULTICALL3,
-      allowFailure: true,
-      contracts: ids.map((id) => ({
-        address: env.chogNftAddress,
-        abi: erc721Abi,
-        functionName: "ownerOf" as const,
-        args: [BigInt(id)] as const,
-      })),
-    })
-    return ids
-      .filter((_, i) => owners[i].status === "success" && getAddress(owners[i].result as Address) === owner)
-      .slice(0, MAX_LISTED)
+    const held: number[] = []
+    // Batches keep each eth_call small enough for public RPC limits.
+    for (let i = 0; i < ids.length; i += SCAN_BATCH) {
+      const batch = ids.slice(i, i + SCAN_BATCH)
+      const owners = await client.multicall({
+        multicallAddress: MULTICALL3,
+        allowFailure: true,
+        contracts: batch.map((id) => ({
+          address: env.chogNftAddress,
+          abi: erc721Abi,
+          functionName: "ownerOf" as const,
+          args: [BigInt(id)] as const,
+        })),
+      })
+      batch.forEach((id, j) => {
+        if (owners[j].status === "success" && getAddress(owners[j].result as Address) === owner) held.push(id)
+      })
+      if (held.length >= MAX_LISTED) break
+    }
+    return held.slice(0, MAX_LISTED)
   } catch {
     return null
   }
@@ -132,7 +141,7 @@ const metaCache = new Map<number, { at: number; meta: ChogMeta }>()
 const META_TTL = 60 * 60 * 1000
 
 function resolveUri(uri: string) {
-  if (uri.startsWith("ipfs://")) return `https://ipfs.io/ipfs/${uri.slice(7).replace(/^ipfs\//, "")}`
+  if (uri.startsWith("ipfs://")) return `${IPFS_GATEWAY}${uri.slice(7).replace(/^ipfs\//, "")}`
   if (uri.startsWith("ar://")) return `https://arweave.net/${uri.slice(5)}`
   return uri
 }
@@ -156,7 +165,7 @@ export async function chogMetadata(tokenId: number): Promise<ChogMeta> {
     } else if (uri.startsWith("data:application/json")) {
       json = JSON.parse(decodeURIComponent(uri.slice(uri.indexOf(",") + 1)))
     } else {
-      const res = await fetch(resolveUri(uri), { signal: AbortSignal.timeout(8000) })
+      const res = await fetch(resolveUri(uri), { signal: AbortSignal.timeout(20_000) })
       json = await res.json()
     }
     meta = {
