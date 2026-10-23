@@ -317,7 +317,12 @@ export default function Start() {
                               <div
                                 role="radiogroup"
                                 aria-label="Your Chogs"
-                                className="-mx-2 grid max-h-[420px] grid-cols-2 gap-3.5 overflow-y-auto px-2 pt-3.5 pb-3 sm:grid-cols-3 lg:max-h-[330px]"
+                                className={cn(
+                                  "-mx-2 grid grid-cols-2 gap-3.5 px-2 pt-3.5 pb-3 sm:grid-cols-3",
+                                  // Only big wallets scroll; a scroll box clips the sticker shadows into a grey band.
+                                  (chogs?.length ?? 0) > 6 &&
+                                    "max-h-[420px] overflow-y-auto [mask-image:linear-gradient(transparent,black_16px,black_calc(100%-16px),transparent)] lg:max-h-[330px]",
+                                )}
                               >
                                 {chogs?.map((c, i) => (
                                   <ChogPick
