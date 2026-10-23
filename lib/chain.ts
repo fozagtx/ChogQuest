@@ -20,6 +20,7 @@ const erc721Abi = parseAbi([
   "function tokenURI(uint256 tokenId) view returns (string)",
   "function balanceOf(address owner) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
 ])
 
 export const chronicleAbi = parseAbi([
@@ -60,7 +61,10 @@ export async function isChogOwner(address: string, tokenId: number) {
 
 const MAX_LISTED = 50
 
-/** Lists Chogs held by a wallet. Requires ERC721Enumerable; returns null if unsupported. */
+/**
+ * Lists Chogs held by a wallet. Uses ERC721Enumerable when available, otherwise
+ * checks ownerOf for every minted token. Returns null if neither works.
+ */
 export async function chogsOfOwner(address: string): Promise<number[] | null> {
   const client = chogClient()
   const owner = getAddress(address)
@@ -74,6 +78,7 @@ export async function chogsOfOwner(address: string): Promise<number[] | null> {
   if (count === 0) return []
   try {
     const ids = await client.multicall({
+      multicallAddress: MULTICALL3,
       allowFailure: false,
       contracts: Array.from({ length: count }, (_, i) => ({
         address: env.chogNftAddress,
@@ -98,8 +103,36 @@ export async function chogsOfOwner(address: string): Promise<number[] | null> {
       }
       return ids.sort((a, b) => a - b)
     } catch {
-      return null
+      return scanOwners(owner)
     }
+  }
+}
+
+const MAX_SCAN = 5000
+// Canonical Multicall3, deployed on Monad. Passed explicitly because the clients have no chain config.
+const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11"
+
+/** For collections without ERC721Enumerable (Chog Genesis): check ownerOf for ids 0..totalSupply. */
+async function scanOwners(owner: Address): Promise<number[] | null> {
+  const client = chogClient()
+  try {
+    const supply = await client.readContract({ address: env.chogNftAddress, abi: erc721Abi, functionName: "totalSupply" })
+    const ids = Array.from({ length: Math.min(Number(supply), MAX_SCAN) + 1 }, (_, i) => i)
+    const owners = await client.multicall({
+      multicallAddress: MULTICALL3,
+      allowFailure: true,
+      contracts: ids.map((id) => ({
+        address: env.chogNftAddress,
+        abi: erc721Abi,
+        functionName: "ownerOf" as const,
+        args: [BigInt(id)] as const,
+      })),
+    })
+    return ids
+      .filter((_, i) => owners[i].status === "success" && getAddress(owners[i].result as Address) === owner)
+      .slice(0, MAX_LISTED)
+  } catch {
+    return null
   }
 }
 

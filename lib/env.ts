@@ -1,6 +1,6 @@
 import "server-only"
 
-import { CHRONICLE, MONAD_TESTNET } from "@/lib/contracts"
+import { CHOG_NFT, CHRONICLE, MONAD_TESTNET } from "@/lib/contracts"
 
 // Server-side configuration. Required values throw on first use so a missing
 // secret fails loudly instead of silently degrading.
@@ -39,7 +39,7 @@ export const env = {
     return optional("CHOG_RPC_URL") ?? this.monadRpcUrl
   },
   get chogNftAddress() {
-    return required("CHOG_NFT_ADDRESS") as `0x${string}`
+    return (optional("CHOG_NFT_ADDRESS") ?? CHOG_NFT.address) as `0x${string}`
   },
   chronicleAddress: () => (optional("CHRONICLE_ADDRESS") ?? CHRONICLE.address) as `0x${string}`,
   voucherSignerKey: () => optional("VOUCHER_SIGNER_PRIVATE_KEY") as `0x${string}` | undefined,
@@ -53,7 +53,8 @@ export const env = {
   // Telegram only accepts A-Z, a-z, 0-9, _ and - in the secret; scripts/set-webhook.ts strips the same way.
   telegramWebhookSecret: () => optional("TELEGRAM_WEBHOOK_SECRET")?.replace(/[^A-Za-z0-9_-]/g, ""),
   telegramBotUsername: () => optional("TELEGRAM_BOT_USERNAME"),
-  appUrl: () => optional("APP_URL") ?? "http://localhost:3000",
+  // Render sets RENDER_EXTERNAL_URL on web services, so APP_URL is only needed elsewhere.
+  appUrl: () => optional("APP_URL") ?? optional("RENDER_EXTERNAL_URL") ?? "http://localhost:3000",
 }
 
 /** Chronicle is "on" only when the contract and both keys are configured. */

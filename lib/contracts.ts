@@ -6,6 +6,13 @@ export const MONAD_TESTNET = {
   explorer: "https://testnet.monadscan.com",
 } as const
 
+/** The Chog NFT, read-only. Same chain as Chronicle, so ownership can be checked on Monad testnet. */
+export const CHOG_NFT = {
+  name: "Chog Genesis (Testnet)",
+  address: "0x11138917b6Dd0782C8Ef98AC7EBB0c3Bd5706ccE",
+  chainId: MONAD_TESTNET.chainId,
+} as const
+
 export const CHRONICLE = {
   address: "0xb46cd62a826b94f07a507c5359f79f189200ec93",
   chainId: MONAD_TESTNET.chainId,

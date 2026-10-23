@@ -26,24 +26,12 @@ envVarGroups:
         sync: false
       - key: AI_API_KEY
         sync: false
-      - key: CHOG_NFT_ADDRESS
-        sync: false
-      - key: CHRONICLE_ADDRESS
-        value: "0xb46cd62a826b94f07a507c5359f79f189200ec93"
-      # Neon (from .env.local after `neon deploy`, or the Neon console).
+      # Neon pooled connection string (the direct one for migrations is derived from it).
       - key: DATABASE_URL
-        sync: false
-      - key: DATABASE_URL_UNPOOLED
         sync: false
       - key: NEON_AI_GATEWAY_BASE_URL
         sync: false
       - key: NEON_AI_GATEWAY_TOKEN
-        sync: false
-      - key: MONAD_RPC_URL
-        value: https://testnet-rpc.monad.xyz
-      - key: CHOG_RPC_URL
-        sync: false
-      - key: APP_URL
         sync: false
 
 services:
