@@ -77,7 +77,7 @@ cd contracts && forge create src/Chronicle.sol:Chronicle --rpc-url http://127.0.
   --private-key <deployer key> --broadcast --constructor-args <owner> <an ERC-721 you hold>
 ```
 
-Set `MONAD_RPC_URL=http://127.0.0.1:8545`, `CHRONICLE_ADDRESS` and `CHOG_NFT_ADDRESS` to those contracts, then:
+Contract addresses live in `lib/contracts.ts`. For a local chain only, point the app at it with `DEV_MONAD_RPC_URL=http://127.0.0.1:8545`, `DEV_CHRONICLE_ADDRESS` and `DEV_CHOG_NFT_ADDRESS`, then:
 
 ```bash
 BASE_URL=http://localhost:3000 SMOKE_PRIVATE_KEY=<holder key> SMOKE_TOKEN_ID=<id> bun run smoke
@@ -97,7 +97,7 @@ Deployed on Monad testnet (chain 10143). It reads the Chog Genesis (Testnet) NFT
 | Deploy transaction | [`0xf163983a…fb739b`](https://testnet.monadscan.com/tx/0xf163983af9ce35133e2e610db587c9d2b303591602cbb93c41df399835fb739b) (block 73,415,961) |
 | Owner (can pause) | [`0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826`](https://testnet.monadscan.com/address/0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826) |
 
-The app uses these addresses by default (`lib/contracts.ts`). An earlier signer-based Chronicle at `0xb46c…ec93` is paused and unused.
+The app always uses these addresses (`lib/contracts.ts`); no env var is needed. An earlier signer-based Chronicle at `0xb46c…ec93` is paused and unused.
 
 ```bash
 cd contracts

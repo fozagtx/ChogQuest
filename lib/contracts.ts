@@ -1,4 +1,4 @@
-// Deployed contract addresses. CHRONICLE_ADDRESS / CHOG_NFT_ADDRESS in the environment override these.
+// Deployed contract addresses. The app always uses these (see lib/env.ts for local-only DEV_* overrides).
 
 export const MONAD_TESTNET = {
   chainId: 10143,

@@ -28,17 +28,18 @@ export const env = {
   get cronSecret() {
     return required("CRON_SECRET")
   },
+  // Chain config lives in lib/contracts.ts. The DEV_* names exist only to point a
+  // local run at anvil; ordinary env vars like CHRONICLE_ADDRESS are ignored on purpose.
   get monadRpcUrl() {
-    return optional("MONAD_RPC_URL") ?? MONAD_TESTNET.rpcUrl
+    return optional("DEV_MONAD_RPC_URL") ?? MONAD_TESTNET.rpcUrl
   },
-  // The Chog NFT may live on a different chain than Chronicle (mainnet vs testnet).
   get chogRpcUrl() {
-    return optional("CHOG_RPC_URL") ?? this.monadRpcUrl
+    return this.monadRpcUrl
   },
   get chogNftAddress() {
-    return (optional("CHOG_NFT_ADDRESS") ?? CHOG_NFT.address) as `0x${string}`
+    return (optional("DEV_CHOG_NFT_ADDRESS") ?? CHOG_NFT.address) as `0x${string}`
   },
-  chronicleAddress: () => (optional("CHRONICLE_ADDRESS") ?? CHRONICLE.address) as `0x${string}`,
+  chronicleAddress: () => (optional("DEV_CHRONICLE_ADDRESS") ?? CHRONICLE.address) as `0x${string}`,
   // Neon AI Gateway (pulled by `neon deploy`). AI_API_KEY is a direct-Anthropic fallback.
   aiGatewayUrl: () => optional("NEON_AI_GATEWAY_BASE_URL"),
   aiGatewayToken: () => optional("NEON_AI_GATEWAY_TOKEN"),
