@@ -214,7 +214,7 @@ export function Footer() {
       links: [
         { label: "Contract", href: explorerAddress(CHRONICLE.address) },
         { label: "Deploy transaction", href: explorerTx(CHRONICLE.deployTx) },
-        { label: "Monad testnet", href: "https://testnet.monad.xyz" },
+        { label: "Monad", href: "https://monad.xyz" },
       ],
     },
     {

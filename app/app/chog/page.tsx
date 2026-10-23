@@ -94,7 +94,7 @@ export default function ChogSheet() {
                 className="mt-1 block truncate text-xs underline"
                 title={state.chronicle.address}
               >
-                Chronicle on Monad testnet: {state.chronicle.address}
+                Chronicle on Monad: {state.chronicle.address}
               </a>
             </section>
 

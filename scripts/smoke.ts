@@ -3,7 +3,7 @@
 // wallet itself, records it, and checks that a second claim is rejected.
 //
 //   BASE_URL=http://localhost:3000 SMOKE_PRIVATE_KEY=0x... SMOKE_TOKEN_ID=7 \
-//   SMOKE_RPC_URL=https://testnet-rpc.monad.xyz bun scripts/smoke.ts
+//   SMOKE_RPC_URL=https://rpc.monad.xyz bun scripts/smoke.ts
 
 import { createPublicClient, createWalletClient, http, parseAbi } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
@@ -73,7 +73,7 @@ const before = await call<State>("/api/state")
 check("state has a night", before.status === 200 && before.data.night !== null, before.data.night)
 check("goal title decrypted for owner", before.data.quests.some((q) => q.name === "Smoke test goal"))
 
-const rpc = http(process.env.SMOKE_RPC_URL ?? "https://testnet-rpc.monad.xyz")
+const rpc = http(process.env.SMOKE_RPC_URL ?? "https://rpc.monad.xyz")
 const reader = createPublicClient({ transport: rpc })
 const wallet = createWalletClient({ account, transport: rpc, chain: { id: await reader.getChainId(), name: "monad", nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 }, rpcUrls: { default: { http: [] } } } })
 const chronicleAbi = parseAbi(["function claimNight(uint256 tokenId, uint32 day) returns (uint16[])"])

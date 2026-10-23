@@ -14,7 +14,7 @@ import {
   type Hex,
 } from "viem"
 
-import { MONAD_TESTNET } from "@/lib/config"
+import { MONAD } from "@/lib/config"
 
 // Browser helpers: API calls and the injected wallet (EIP-1193).
 
@@ -70,12 +70,12 @@ export async function signIn() {
 
 // ---------- claiming on-chain from the player's wallet ----------
 
-const monadTestnet = defineChain({
-  id: MONAD_TESTNET.chainId,
-  name: "Monad Testnet",
+const monadChain = defineChain({
+  id: MONAD.chainId,
+  name: MONAD.name,
   nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
-  rpcUrls: { default: { http: [MONAD_TESTNET.rpcUrl] } },
-  blockExplorers: { default: { name: "Monadscan", url: MONAD_TESTNET.explorer } },
+  rpcUrls: { default: { http: [MONAD.rpcUrl] } },
+  blockExplorers: { default: { name: "Monadscan", url: MONAD.explorer } },
 })
 
 const claimAbi = parseAbi([
@@ -93,8 +93,8 @@ const revertMessages: Record<string, string> = {
   EnforcedPause: "Claims are paused for a moment. Try again later.",
 }
 
-async function switchToMonadTestnet() {
-  const chainId = `0x${MONAD_TESTNET.chainId.toString(16)}`
+async function switchToMonad() {
+  const chainId = `0x${MONAD.chainId.toString(16)}`
   try {
     await provider().request({ method: "wallet_switchEthereumChain", params: [{ chainId }] })
   } catch (err) {
@@ -105,10 +105,10 @@ async function switchToMonadTestnet() {
       params: [
         {
           chainId,
-          chainName: "Monad Testnet",
+          chainName: MONAD.name,
           nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
-          rpcUrls: [MONAD_TESTNET.rpcUrl],
-          blockExplorerUrls: [MONAD_TESTNET.explorer],
+          rpcUrls: [MONAD.rpcUrl],
+          blockExplorerUrls: [MONAD.explorer],
         },
       ],
     })
@@ -118,9 +118,9 @@ async function switchToMonadTestnet() {
 /** Sends Chronicle.claimNight from the connected wallet and waits for it to land. */
 export async function claimOnChain(chronicle: Address, tokenId: number, day: number): Promise<Hex> {
   const account = await connectWallet()
-  await switchToMonadTestnet()
-  const wallet = createWalletClient({ account, chain: monadTestnet, transport: custom(provider()) })
-  const reader = createPublicClient({ chain: monadTestnet, transport: http() })
+  await switchToMonad()
+  const wallet = createWalletClient({ account, chain: monadChain, transport: custom(provider()) })
+  const reader = createPublicClient({ chain: monadChain, transport: http() })
   try {
     const { request } = await reader.simulateContract({
       account,
@@ -139,7 +139,7 @@ export async function claimOnChain(chronicle: Address, tokenId: number, day: num
       const name = revert instanceof ContractFunctionRevertedError ? revert.data?.errorName : undefined
       if (name && revertMessages[name]) throw new Error(revertMessages[name])
       if (/insufficient funds/i.test(err.message)) {
-        throw new Error("This wallet needs a little testnet MON for gas. Get some at faucet.monad.xyz.")
+        throw new Error("This wallet needs a little MON on Monad for gas. A claim costs about 0.02 MON.")
       }
     }
     throw err

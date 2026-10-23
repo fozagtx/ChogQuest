@@ -1,6 +1,6 @@
 import "server-only"
 
-import { CHOG_NFT, CHRONICLE, MONAD_TESTNET } from "@/lib/config"
+import { CHOG_NFT, CHRONICLE, MONAD } from "@/lib/config"
 
 // Server-side configuration. Required values throw on first use so a missing
 // secret fails loudly instead of silently degrading.
@@ -31,7 +31,7 @@ export const env = {
   // Chain config lives in lib/config.ts. The DEV_* names exist only to point a
   // local run at anvil; ordinary env vars like CHRONICLE_ADDRESS are ignored on purpose.
   get monadRpcUrl() {
-    return optional("DEV_MONAD_RPC_URL") ?? MONAD_TESTNET.rpcUrl
+    return optional("DEV_MONAD_RPC_URL") ?? MONAD.rpcUrl
   },
   get chogRpcUrl() {
     return this.monadRpcUrl

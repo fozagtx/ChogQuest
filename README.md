@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://testnet.monadscan.com/address/0xb46cd62a826b94f07a507c5359f79f189200ec93">Chronicle on Monad testnet</a>
+  <a href="https://monadscan.com/address/0xB46cd62a826b94f07a507c5359F79F189200ec93">Chronicle on Monad</a>
   ·
   <a href="https://chogathon.chog.xyz">Chogathon 2026</a>
 </p>
@@ -41,14 +41,14 @@ Built for Chogathon 2026.
 | `neon.ts`, `functions/scheduler.ts` | Neon backend: Postgres and the scheduler Function with its evening trigger |
 | `contracts/` | Foundry project with `Chronicle.sol`, 21 tests, deploy script |
 | `scripts/smoke.ts` | End-to-end check of the API with a real wallet key |
-| `lib/config.ts` | Public settings: Monad testnet RPC and explorer, Chog NFT and Chronicle addresses, Telegram bot username, Nebius endpoint and model |
+| `lib/config.ts` | Public settings: Monad mainnet RPC and explorer, Chog NFT and Chronicle addresses, Telegram bot username, Nebius endpoint and model |
 | `render.yaml` | Render Blueprint for the web service and its env group (secrets only) |
 
 ## Trust model
 
-- **No keys on the server.** The Chog's holder claims each night from their own wallet. Chronicle checks `ownerOf` on the Chog Genesis NFT itself, rolls the night's items on-chain from `(tokenId, day)`, and records them. The server only reads the chain: it shows the same roll on the diary page, then verifies the claim transaction's `NightClaimed` event before mirroring it into the app.
+- **No keys on the server.** The Chog's holder claims each night from their own wallet. Chronicle checks `ownerOf` on the Chog Genesis NFT itself (both on Monad mainnet), rolls the night's items on-chain from `(tokenId, day)`, and records them. The server only reads the chain: it shows the same roll on the diary page, then verifies the claim transaction's `NightClaimed` event before mirroring it into the app.
 - Chronicle allows one claim per Chog per day, for today or yesterday only (`DayNotClaimable`, `AlreadyClaimed`). Progress belongs to the token ID, so it follows the Chog to a new wallet. The owner can pause claims.
-- Claims cost the player a little testnet MON for gas.
+- Claims cost the player a little MON for gas (about 0.02 MON per claim).
 - Goal titles and check-in notes are AES-256-GCM encrypted at rest and never logged. On-chain: claim XP, level, streak and item IDs. Check-in and quest XP stay in the app. Share cards hide goal names by default. "Delete my data" removes goals and check-ins.
 
 ## Local development
@@ -90,20 +90,20 @@ The smoke test signs in, rejects a Chog the wallet doesn't hold, creates a goal,
 
 ### 1. Chronicle on Monad
 
-Deployed on Monad testnet (chain 10143). It reads the Chog Genesis (Testnet) NFT at [`0x1113…6ccE`](https://testnet.monadscan.com/address/0x11138917b6Dd0782C8Ef98AC7EBB0c3Bd5706ccE).
+Deployed on **Monad mainnet** (chain 143). It reads the real [Chog Genesis](https://monadscan.com/address/0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763) collection (1,969 Chogs), so any Chog holder can play.
 
 | | |
 | --- | --- |
-| Chronicle contract | [`0x6b52bBa2e20E1B3842dd2b297d5398d718e548b6`](https://testnet.monadscan.com/address/0x6b52bBa2e20E1B3842dd2b297d5398d718e548b6) |
-| Deploy transaction | [`0xf163983a…fb739b`](https://testnet.monadscan.com/tx/0xf163983af9ce35133e2e610db587c9d2b303591602cbb93c41df399835fb739b) (block 73,415,961) |
-| Owner (can pause) | [`0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826`](https://testnet.monadscan.com/address/0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826) |
+| Chronicle contract | [`0xB46cd62a826b94f07a507c5359F79F189200ec93`](https://monadscan.com/address/0xB46cd62a826b94f07a507c5359F79F189200ec93) |
+| Deploy transaction | [`0x6474bd30…feef4b`](https://monadscan.com/tx/0x6474bd30c171e7200e670f4fec7972eaac4276e6fa1afa30d4cf32dda2feef4b) (block 115,792,506) |
+| Owner (can pause) | [`0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826`](https://monadscan.com/address/0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826) |
 
-The app always uses these addresses from `lib/config.ts`; no env var is needed. An earlier signer-based Chronicle at `0xb46c…ec93` is paused and unused.
+The app always uses these addresses from `lib/config.ts`; no env var is needed. Earlier testnet deployments on chain 10143 are unused. The mainnet Chronicle shares its address with the paused signer-based testnet one only because both were the deployer's first transaction on their chain.
 
 ```bash
 cd contracts
 export DEPLOYER_PRIVATE_KEY=0x...      # only for deploying; the app never needs it
-forge script script/Deploy.s.sol:Deploy --rpc-url monad_testnet --broadcast
+forge script script/Deploy.s.sol:Deploy --rpc-url monad --broadcast
 ```
 
 ### 2. Neon (database and scheduler)
@@ -134,7 +134,7 @@ Notes from Render's docs (October 2026): a Free web service spins down after 15 
 ## Testing instructions for judges
 
 1. Open the app URL and press **CLAIM YOUR CHOG**.
-2. Connect a wallet that holds a Chog Genesis (Testnet) NFT and a little testnet MON for gas, then sign the free sign-in message.
+2. Connect a wallet that holds a Chog Genesis NFT on Monad mainnet and a little MON for gas, then sign the free sign-in message.
 3. Pick your Chog and set a first goal.
 4. On **Today**, read last night's diary, press **CLAIM** and confirm in your wallet. XP goes up and the transaction links to the explorer.
 5. Check in on your goal. Your Chog's quest moves too.

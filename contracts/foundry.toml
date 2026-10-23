@@ -14,4 +14,4 @@ remappings = [
 [rpc_endpoints]
 # Monad testnet, chain id 10143
 monad_testnet = "https://testnet-rpc.monad.xyz"
-monad = "${MONAD_RPC_URL}"
+monad = "https://rpc.monad.xyz"

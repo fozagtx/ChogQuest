@@ -1,24 +1,25 @@
 // Public app config. Nothing here is secret, so it lives in code, not in env vars.
 // Secrets (database URL, session and encryption keys, bot token) stay in env.
 
-export const MONAD_TESTNET = {
-  chainId: 10143,
-  rpcUrl: "https://testnet-rpc.monad.xyz",
-  explorer: "https://testnet.monadscan.com",
+export const MONAD = {
+  name: "Monad",
+  chainId: 143,
+  rpcUrl: "https://rpc.monad.xyz",
+  explorer: "https://monadscan.com",
 } as const
 
-/** The Chog NFT, read-only. Same chain as Chronicle, so ownership can be checked on Monad testnet. */
+/** The real Chog Genesis collection, read-only. Same chain as Chronicle, so the contract checks ownership itself. */
 export const CHOG_NFT = {
-  name: "Chog Genesis (Testnet)",
-  address: "0x11138917b6Dd0782C8Ef98AC7EBB0c3Bd5706ccE",
-  chainId: MONAD_TESTNET.chainId,
+  name: "Chog Genesis",
+  address: "0xc96d31f8626c6d03fae5dcd3d61e3fb9f4a73763",
+  chainId: MONAD.chainId,
 } as const
 
 export const CHRONICLE = {
-  address: "0x6b52bBa2e20E1B3842dd2b297d5398d718e548b6",
-  chainId: MONAD_TESTNET.chainId,
-  deployTx: "0xf163983af9ce35133e2e610db587c9d2b303591602cbb93c41df399835fb739b",
-  deployBlock: 73_415_961,
+  address: "0xB46cd62a826b94f07a507c5359F79F189200ec93",
+  chainId: MONAD.chainId,
+  deployTx: "0x6474bd30c171e7200e670f4fec7972eaac4276e6fa1afa30d4cf32dda2feef4b",
+  deployBlock: 115_792_506,
 } as const
 
 /** IPFS gateway for Chog metadata and art. ipfs.io and dweb.link stopped serving direct requests. */
@@ -41,9 +42,9 @@ export function telegramBotUrl(startCode?: string) {
 }
 
 export function explorerAddress(address: string) {
-  return `${MONAD_TESTNET.explorer}/address/${address}`
+  return `${MONAD.explorer}/address/${address}`
 }
 
 export function explorerTx(hash: string) {
-  return `${MONAD_TESTNET.explorer}/tx/${hash}`
+  return `${MONAD.explorer}/tx/${hash}`
 }

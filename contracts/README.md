@@ -31,8 +31,10 @@ Deploy (the deployer becomes the owner):
 
 ```bash
 export DEPLOYER_PRIVATE_KEY=0x...
-export CHOG_NFT_ADDRESS=0x...    # optional, defaults to Chog Genesis (Testnet)
-forge script script/Deploy.s.sol:Deploy --rpc-url monad_testnet --broadcast
+export CHOG_NFT_ADDRESS=0x...    # optional, defaults to Chog Genesis on Monad mainnet
+forge script script/Deploy.s.sol:Deploy --rpc-url monad --broadcast
 ```
 
-Deployed on Monad testnet: `0x6b52bBa2e20E1B3842dd2b297d5398d718e548b6`.
+Deployed on Monad mainnet (chain 143): `0xB46cd62a826b94f07a507c5359F79F189200ec93`, reading Chog Genesis at `0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763`.
+
+Earlier testnet deployments (unused): `0x6b52bBa2e20E1B3842dd2b297d5398d718e548b6` and the paused signer-based `0xb46c…ec93` on chain 10143.

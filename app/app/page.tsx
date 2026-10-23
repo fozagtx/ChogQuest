@@ -229,7 +229,7 @@ function NightCard({
             className="truncate text-center text-xs underline"
             title={night.txHash}
           >
-            View on Monad testnet: {night.txHash}
+            View on Monad: {night.txHash}
           </a>
         )}
       </div>
