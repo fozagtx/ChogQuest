@@ -70,7 +70,7 @@ services:
     plan: starter
     schedule: "0 7 * * *"
     buildCommand: echo "no build"
-    startCommand: curl -fsS -H "x-cron-secret: $CRON_SECRET" "$APP_URL/api/cron/morning"
+    startCommand: 'curl -fsS -H "x-cron-secret: $CRON_SECRET" "$APP_URL/api/cron/morning"'
     envVars:
       - fromGroup: questchog-secrets
 
@@ -81,6 +81,6 @@ services:
     plan: starter
     schedule: "0 19 * * *"
     buildCommand: echo "no build"
-    startCommand: curl -fsS -H "x-cron-secret: $CRON_SECRET" "$APP_URL/api/cron/evening"
+    startCommand: 'curl -fsS -H "x-cron-secret: $CRON_SECRET" "$APP_URL/api/cron/evening"'
     envVars:
       - fromGroup: questchog-secrets
