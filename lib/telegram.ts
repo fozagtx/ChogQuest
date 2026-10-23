@@ -29,3 +29,30 @@ export function sendMessage(chatId: number, text: string, buttons?: InlineButton
 export function answerCallback(id: string, text?: string) {
   return tg("answerCallbackQuery", { callback_query_id: id, ...(text ? { text } : {}) })
 }
+
+let bot: Promise<{ username: string } | null> | null = null
+
+/**
+ * Points Telegram at this app's webhook (once per server process) and returns the bot's username.
+ * Needs only TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET on the server; nothing to run by hand.
+ */
+export function ensureBot() {
+  bot ??= (async () => {
+    const secret = env.telegramWebhookSecret()
+    if (!env.telegramBotToken() || !secret) return null
+    const me = (await tg("getMe", {})) as { username: string }
+    await tg("setWebhook", {
+      url: `${env.appUrl()}/api/telegram`,
+      secret_token: secret,
+      allowed_updates: ["message", "callback_query"],
+    })
+    // The bot has no slash commands besides /start.
+    await tg("deleteMyCommands", {})
+    return { username: me.username }
+  })().catch((err) => {
+    console.error("telegram setup failed", (err as Error).message)
+    bot = null
+    return null
+  })
+  return bot
+}

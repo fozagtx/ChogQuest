@@ -1,7 +1,7 @@
 import { handle, json, requireUser } from "@/lib/api"
 import { randomCode } from "@/lib/crypto"
 import { getDb, schema } from "@/lib/db"
-import { telegramBotUrl } from "@/lib/config"
+import { ensureBot } from "@/lib/telegram"
 
 export const POST = handle(async () => {
   const user = await requireUser()
@@ -9,5 +9,6 @@ export const POST = handle(async () => {
   await getDb()
     .insert(schema.linkCodes)
     .values({ code, userId: user.id, expiresAt: new Date(Date.now() + 15 * 60_000) })
-  return json({ code, url: telegramBotUrl(code) })
+  const bot = await ensureBot()
+  return json({ code, url: bot ? `https://t.me/${bot.username}?start=${code}` : null })
 })
