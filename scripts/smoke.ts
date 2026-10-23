@@ -1,10 +1,14 @@
 // End-to-end smoke test against a running app. Signs in with a wallet key,
-// picks a Chog, sets a goal, checks in, claims the night and checks that a
-// second claim is rejected.
+// picks a Chog, sets a goal, checks in, claims the night on Chronicle from the
+// wallet itself, records it, and checks that a second claim is rejected.
 //
-//   BASE_URL=http://localhost:3000 SMOKE_PRIVATE_KEY=0x... SMOKE_TOKEN_ID=7 bun scripts/smoke.ts
+//   BASE_URL=http://localhost:3000 SMOKE_PRIVATE_KEY=0x... SMOKE_TOKEN_ID=7 \
+//   SMOKE_RPC_URL=https://testnet-rpc.monad.xyz bun scripts/smoke.ts
 
+import { createPublicClient, createWalletClient, http, parseAbi } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
+
+import { dayNumber } from "../lib/days"
 
 const base = process.env.BASE_URL ?? "http://localhost:3000"
 const key = process.env.SMOKE_PRIVATE_KEY as `0x${string}` | undefined
@@ -60,6 +64,7 @@ const again = await call("/api/checkins", { goalId: goal.data.id })
 check("second check-in same day rejected", again.status === 409)
 
 type State = {
+  chronicle: { address: string }
   chog: { xp: number; streak: number } | null
   night: { day: string; claimable: boolean; items: unknown[] } | null
   quests: { name: string }[]
@@ -68,13 +73,36 @@ const before = await call<State>("/api/state")
 check("state has a night", before.status === 200 && before.data.night !== null, before.data.night)
 check("goal title decrypted for owner", before.data.quests.some((q) => q.name === "Smoke test goal"))
 
-const claim = await call<{ xpGain: number; txHash: string | null; streak: number }>("/api/claim", {
-  day: before.data.night?.day,
-})
-check("claim night", claim.status === 200, claim.data)
+const rpc = http(process.env.SMOKE_RPC_URL ?? "https://testnet-rpc.monad.xyz")
+const reader = createPublicClient({ transport: rpc })
+const wallet = createWalletClient({ account, transport: rpc, chain: { id: await reader.getChainId(), name: "monad", nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 }, rpcUrls: { default: { http: [] } } } })
+const chronicleAbi = parseAbi(["function claimNight(uint256 tokenId, uint32 day) returns (uint16[])"])
+const chronicle = before.data.chronicle.address as `0x${string}`
+const claimDay = dayNumber(before.data.night!.day)
 
-const double = await call("/api/claim", { day: before.data.night?.day })
-check("second claim same day rejected", double.status === 409, double.data)
+const txHash = await wallet.writeContract({
+  address: chronicle,
+  abi: chronicleAbi,
+  functionName: "claimNight",
+  args: [BigInt(tokenId), claimDay],
+})
+await reader.waitForTransactionReceipt({ hash: txHash })
+const claim = await call<{ xpGain: number; txHash: string; streak: number }>("/api/claim", { txHash })
+check("claim night on-chain and record it", claim.status === 200 && claim.data.txHash === txHash, claim.data)
+
+const recordAgain = await call<{ xpGain: number }>("/api/claim", { txHash })
+check("recording the same claim again is a no-op", recordAgain.status === 200, recordAgain.data)
+
+let rejected = false
+try {
+  await reader.simulateContract({ account, address: chronicle, abi: chronicleAbi, functionName: "claimNight", args: [BigInt(tokenId), claimDay] })
+} catch {
+  rejected = true
+}
+check("second claim same day rejected on-chain", rejected)
+
+const stranger = await call("/api/claim", { txHash: `0x${"ab".repeat(32)}` })
+check("unknown transaction rejected", stranger.status >= 400, stranger.data)
 
 const after = await call<State>("/api/state")
 check("XP went up", (after.data.chog?.xp ?? 0) > (before.data.chog?.xp ?? 0), {
@@ -87,4 +115,4 @@ check("delete my data", del.status === 200)
 const wiped = await call<State>("/api/state")
 check("goals gone after delete", wiped.data.quests.every((q) => q.name !== "Smoke test goal"))
 
-console.log(claim.data.txHash ? `claim tx ${claim.data.txHash}` : "Chronicle not configured: claim stored in DB only")
+console.log(`claim tx ${claim.data.txHash}`)

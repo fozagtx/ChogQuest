@@ -43,11 +43,9 @@ export async function runEvening() {
     const count = night.items.length
     try {
       await sendMessage(user.telegramId!, `Your Chog is back with ${count} item${count > 1 ? "s" : ""}. Claim them before the end of tomorrow.`, [
-        [
-          { text: `Claim ${count}`, callback_data: `claim:${day}` },
-          { text: "Mute", callback_data: "mute" },
-        ],
-        [{ text: "Read the diary", url: `${env.appUrl()}/app` }],
+        // Claims are signed by the player's own wallet, so the button opens the app.
+        [{ text: `Claim ${count} in the app`, url: `${env.appUrl()}/app` }],
+        [{ text: "Mute", callback_data: "mute" }],
       ])
       sent++
     } catch (err) {

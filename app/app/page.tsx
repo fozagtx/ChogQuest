@@ -12,9 +12,9 @@ import { Gate, Notice } from "@/components/game/gate"
 import { rarityFill } from "@/components/game/rarity"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { api, errorMessage } from "@/lib/client"
+import { api, claimOnChain, errorMessage } from "@/lib/client"
 import { explorerTx } from "@/lib/contracts"
-import { formatTimeLeft } from "@/lib/days"
+import { dayNumber, formatTimeLeft } from "@/lib/days"
 import type { NightView } from "@/lib/state-types"
 import { CHECKIN_XP, LEVEL_XP } from "@/lib/xp"
 import { cn } from "@/lib/utils"
@@ -62,12 +62,16 @@ export default function Today() {
                 busy={busy === "claim"}
                 onClaim={(button) =>
                   run("claim", async () => {
-                    const res = await api<{ xpGain: number; txHash: string | null }>("/api/claim", {
-                      body: { day: night.day },
-                    })
+                    // The player's own wallet claims on Chronicle; the app then records it.
+                    const txHash = await claimOnChain(
+                      state.chronicle.address as `0x${string}`,
+                      chog.tokenId,
+                      dayNumber(night.day),
+                    )
+                    const res = await api<{ xpGain: number; txHash: string }>("/api/claim", { body: { txHash } })
                     burst(button, night.rarityMax === "EPIC" ? "epic" : "celebrate")
                     if (res.xpGain > 0) floatText(button, `+${res.xpGain} XP`)
-                    return `CLAIMED. +${res.xpGain} XP${res.txHash ? ". RECORDED ON MONAD." : "."}`
+                    return `CLAIMED. +${res.xpGain} XP. RECORDED ON MONAD.`
                   })
                 }
               />
@@ -213,7 +217,7 @@ function NightCard({
             onClick={(e) => onClaim(e.currentTarget)}
             disabled={!night.claimable || busy}
           >
-            {busy ? "CLAIMING..." : label}
+            {busy ? "CONFIRM IN WALLET..." : label}
           </Button>
         </Magnetic>
         <div className="text-center font-pixel text-xs font-bold">{footer}</div>

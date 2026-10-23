@@ -2,27 +2,26 @@
 pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Chronicle} from "../src/Chronicle.sol";
 
-/// @notice Deploys Chronicle. The deployer becomes the owner.
-/// Env: DEPLOYER_PRIVATE_KEY, VOUCHER_SIGNER_ADDRESS, MAX_XP_PER_CLAIM (optional, default 1000, must match the server cap).
+/// @notice Deploys Chronicle. The deployer becomes the owner (can pause and unpause).
+/// Env: DEPLOYER_PRIVATE_KEY, CHOG_NFT_ADDRESS (optional, defaults to Chog Genesis on Monad testnet).
 contract Deploy is Script {
+    address constant CHOG_GENESIS_TESTNET = 0x11138917b6Dd0782C8Ef98AC7EBB0c3Bd5706ccE;
+
     function run() external returns (Chronicle chronicle) {
         uint256 deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address voucherSigner = vm.envAddress("VOUCHER_SIGNER_ADDRESS");
-        uint256 maxXp = vm.envOr("MAX_XP_PER_CLAIM", uint256(1000));
-        require(maxXp <= type(uint32).max, "MAX_XP_PER_CLAIM too large");
-
+        address chogNft = vm.envOr("CHOG_NFT_ADDRESS", CHOG_GENESIS_TESTNET);
         address deployer = vm.addr(deployerPk);
 
         vm.startBroadcast(deployerPk);
-        chronicle = new Chronicle(deployer, voucherSigner, uint32(maxXp));
+        chronicle = new Chronicle(deployer, IERC721(chogNft));
         vm.stopBroadcast();
 
         console.log("Chronicle deployed at:", address(chronicle));
         console.log("Owner:", deployer);
-        console.log("Voucher signer:", voucherSigner);
-        console.log("Max XP per claim:", maxXp);
+        console.log("Chog NFT:", chogNft);
         console.log("Chain id:", block.chainid);
     }
 }

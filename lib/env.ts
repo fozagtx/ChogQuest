@@ -25,9 +25,6 @@ export const env = {
   get sessionSecret() {
     return required("SESSION_SECRET")
   },
-  get nightSecret() {
-    return required("NIGHT_SECRET")
-  },
   get cronSecret() {
     return required("CRON_SECRET")
   },
@@ -42,8 +39,6 @@ export const env = {
     return (optional("CHOG_NFT_ADDRESS") ?? CHOG_NFT.address) as `0x${string}`
   },
   chronicleAddress: () => (optional("CHRONICLE_ADDRESS") ?? CHRONICLE.address) as `0x${string}`,
-  voucherSignerKey: () => optional("VOUCHER_SIGNER_PRIVATE_KEY") as `0x${string}` | undefined,
-  relayerKey: () => optional("RELAYER_PRIVATE_KEY") as `0x${string}` | undefined,
   // Neon AI Gateway (pulled by `neon deploy`). AI_API_KEY is a direct-Anthropic fallback.
   aiGatewayUrl: () => optional("NEON_AI_GATEWAY_BASE_URL"),
   aiGatewayToken: () => optional("NEON_AI_GATEWAY_TOKEN"),
@@ -55,9 +50,4 @@ export const env = {
   telegramBotUsername: () => optional("TELEGRAM_BOT_USERNAME"),
   // Render sets RENDER_EXTERNAL_URL on web services, so APP_URL is only needed elsewhere.
   appUrl: () => optional("APP_URL") ?? optional("RENDER_EXTERNAL_URL") ?? "http://localhost:3000",
-}
-
-/** Chronicle is "on" only when the contract and both keys are configured. */
-export function chronicleEnabled() {
-  return Boolean(env.chronicleAddress() && env.voucherSignerKey() && env.relayerKey())
 }

@@ -6,8 +6,6 @@ export const LEVEL_XP = 500
 export const CHECKIN_XP = 60
 export const CLAIM_XP = 40
 export const MAX_GOALS = 3
-// Must match maxXpPerClaim on the deployed Chronicle (lib/contracts.ts).
-export const MAX_XP_PER_CLAIM = 1000
 
 export function levelFor(xp: number) {
   return 1 + Math.floor(xp / LEVEL_XP)

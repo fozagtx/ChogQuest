@@ -1,13 +1,14 @@
 import "server-only"
 
 import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm"
+import { getAddress } from "viem"
 
 import { HttpError } from "@/lib/api"
-import { chogMetadata, isChogOwner, relayClaim, signVoucher } from "@/lib/chain"
+import { chogMetadata, isChogOwner, verifyClaimTx } from "@/lib/chain"
 import { decrypt, encrypt } from "@/lib/crypto"
-import { addDays, dayNumber, startOfDay, today } from "@/lib/days"
+import { addDays, dayFromNumber, startOfDay, today } from "@/lib/days"
 import { getDb, schema, type Tx } from "@/lib/db"
-import { chronicleEnabled, env } from "@/lib/env"
+import { env } from "@/lib/env"
 import { itemById, type Rarity } from "@/lib/items"
 import { narrateNight } from "@/lib/narrate"
 import { rollNight } from "@/lib/night"
@@ -18,7 +19,6 @@ import {
   CHECKIN_XP,
   CLAIM_XP,
   MAX_GOALS,
-  MAX_XP_PER_CLAIM,
   computeStreak,
   levelProgress,
   questReward,
@@ -282,7 +282,7 @@ export async function getOrCreateNight(tokenId: number, day: string) {
   const [existing] = await find()
   if (existing) return existing
 
-  const roll = rollNight(tokenId, day, env.nightSecret)
+  const roll = await rollNight(tokenId, day)
   const story = await narrateNight(tokenId, roll)
   await db
     .insert(nights)
@@ -361,88 +361,59 @@ async function streakFor(db: DbLike, tokenId: number, extraDay?: string) {
   return computeStreak(days, today())
 }
 
-export type ClaimResult = { day: string; xpGain: number; streak: number; txHash: string | null }
+export type ClaimResult = { day: string; xpGain: number; streak: number; txHash: string }
 
-export async function claimNight(
-  user: User,
-  via: "web" | "telegram",
-  day?: string,
-): Promise<ClaimResult> {
-  if (!rateLimit(`claim:${user.id}`, 5, 60_000)) throw new HttpError(429, "Slow down a little.")
-  const tokenId = await requireChog(user)
-  // Ownership is checked fresh on-chain before every voucher.
-  if (!(await verifyOwner(user.walletAddress, tokenId, true))) {
-    throw new HttpError(403, "That Chog is not in your wallet.")
+/**
+ * Records a claim the player already made on-chain from their own wallet.
+ * Chronicle checked ownership and rolled the items; here we confirm the
+ * transaction and mirror it into the app's ledger. Safe to call twice.
+ */
+export async function recordClaim(user: User, txHash: string): Promise<ClaimResult> {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new HttpError(400, "Invalid transaction hash.")
+  if (!rateLimit(`claim:${user.id}`, 10, 60_000)) throw new HttpError(429, "Slow down a little.")
+
+  let claim: Awaited<ReturnType<typeof verifyClaimTx>>
+  try {
+    claim = await verifyClaimTx(txHash as `0x${string}`)
+  } catch {
+    throw new HttpError(504, "Could not confirm the transaction yet. Try again in a moment.")
+  }
+  if (!claim) throw new HttpError(400, "That transaction is not a Chronicle claim.")
+  if (claim.holder !== getAddress(user.walletAddress)) {
+    throw new HttpError(403, "That claim was made by a different wallet.")
   }
 
-  const target = day ?? (await currentNight(tokenId))?.day
-  if (!target) throw new HttpError(404, "No night to claim yet.")
+  const day = dayFromNumber(claim.day)
+  // Make sure the night exists (it normally does: the player saw its diary page).
+  await getOrCreateNight(claim.tokenId, day)
 
   return getDb().transaction(async (tx) => {
-    const [night] = await tx
+    const [existing] = await tx
       .select()
-      .from(nights)
-      .where(and(eq(nights.chogTokenId, tokenId), eq(nights.day, target)))
-      .for("update")
-    if (!night) throw new HttpError(404, "No night to claim yet.")
-    if (night.claimedAt) throw new HttpError(409, "Already claimed. Safe in your Chronicle.")
-    if (night.expiresAt < new Date()) throw new HttpError(410, "This night slipped away.")
-    const lastDay = await lastClaimDay(tx, tokenId)
-    if (lastDay && lastDay >= night.day) throw new HttpError(409, "A later night was already claimed.")
-
-    const { streak } = await streakFor(tx, tokenId, today())
-
-    // Carry unsynced XP on-chain with this claim, within the per-claim cap.
-    const pending = await tx
-      .select({ id: xpEvents.id, amount: xpEvents.amount })
-      .from(xpEvents)
-      .where(and(eq(xpEvents.chogTokenId, tokenId), isNull(xpEvents.claimId)))
-      .orderBy(asc(xpEvents.id))
-    let xpGain = CLAIM_XP
-    const carried: number[] = []
-    for (const e of pending) {
-      if (xpGain + e.amount > MAX_XP_PER_CLAIM) break
-      xpGain += e.amount
-      carried.push(e.id)
+      .from(claims)
+      .where(and(eq(claims.chogTokenId, claim.tokenId), eq(claims.day, day)))
+    if (existing) {
+      return { day, xpGain: existing.xpGain, streak: existing.streak, txHash: existing.txHash ?? txHash }
     }
 
-    const inserted = await tx
+    const { streak } = await streakFor(tx, claim.tokenId, today())
+    const [inserted] = await tx
       .insert(claims)
-      .values({ chogTokenId: tokenId, day: night.day, userId: user.id, xpGain, streak, via })
-      .onConflictDoNothing()
+      .values({ chogTokenId: claim.tokenId, day, userId: user.id, xpGain: CLAIM_XP, streak, txHash, via: "web" })
       .returning({ id: claims.id })
-    if (inserted.length === 0) throw new HttpError(409, "Already claimed. Safe in your Chronicle.")
-    const claimId = inserted[0].id
-
+    await tx.insert(xpEvents).values({
+      chogTokenId: claim.tokenId,
+      userId: user.id,
+      kind: "claim",
+      amount: CLAIM_XP,
+      day: today(),
+      claimId: inserted.id,
+    })
     await tx
-      .insert(xpEvents)
-      .values({ chogTokenId: tokenId, userId: user.id, kind: "claim", amount: CLAIM_XP, day: today(), claimId })
-    if (carried.length) {
-      await tx.update(xpEvents).set({ claimId }).where(inArray(xpEvents.id, carried))
-    }
-    await tx.update(nights).set({ claimedAt: new Date() }).where(eq(nights.id, night.id))
-
-    let txHash: string | null = null
-    if (chronicleEnabled()) {
-      // If the chain rejects the claim, the whole DB transaction rolls back.
-      const voucher = {
-        tokenId: BigInt(tokenId),
-        day: dayNumber(night.day),
-        itemIds: night.items.map((i) => i.id),
-        xpGain,
-        streak,
-        deadline: BigInt(Math.floor(Date.now() / 1000) + 600),
-      }
-      try {
-        txHash = await relayClaim(voucher, await signVoucher(voucher))
-      } catch (err) {
-        console.error("relay failed", (err as Error).message)
-        throw new HttpError(502, "The chain did not accept the claim. Try again in a minute.")
-      }
-      await tx.update(claims).set({ txHash }).where(eq(claims.id, claimId))
-    }
-
-    return { day: night.day, xpGain, streak, txHash }
+      .update(nights)
+      .set({ claimedAt: new Date() })
+      .where(and(eq(nights.chogTokenId, claim.tokenId), eq(nights.day, day)))
+    return { day, xpGain: CLAIM_XP, streak, txHash }
   })
 }
 
@@ -464,7 +435,7 @@ export async function getState(user: User): Promise<AppState> {
     lostAndFound: { nights: 0, items: [] },
     weeklyXp: [],
     lastCompleted: null,
-    chronicle: { enabled: chronicleEnabled(), address: env.chronicleAddress() },
+    chronicle: { address: env.chronicleAddress() },
   }
 
   const tokenId = await activeChog(user)

@@ -1,4 +1,4 @@
-// Deployed contract addresses. CHRONICLE_ADDRESS in the environment overrides these.
+// Deployed contract addresses. CHRONICLE_ADDRESS / CHOG_NFT_ADDRESS in the environment override these.
 
 export const MONAD_TESTNET = {
   chainId: 10143,
@@ -14,11 +14,10 @@ export const CHOG_NFT = {
 } as const
 
 export const CHRONICLE = {
-  address: "0xb46cd62a826b94f07a507c5359f79f189200ec93",
+  address: "0x6b52bBa2e20E1B3842dd2b297d5398d718e548b6",
   chainId: MONAD_TESTNET.chainId,
-  deployTx: "0x1045bec6056a0dee2e127928713dcc2433dddf24d837d620832f36a72a3bd3a1",
-  deployBlock: 73_399_927,
-  maxXpPerClaim: 1000,
+  deployTx: "0xf163983af9ce35133e2e610db587c9d2b303591602cbb93c41df399835fb739b",
+  deployBlock: 73_415_961,
 } as const
 
 export function explorerAddress(address: string) {

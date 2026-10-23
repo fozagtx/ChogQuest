@@ -6,8 +6,6 @@ envVarGroups:
         generateValue: true
       - key: SESSION_SECRET
         generateValue: true
-      - key: NIGHT_SECRET
-        generateValue: true
       - key: TELEGRAM_WEBHOOK_SECRET
         generateValue: true
       # Entered in the dashboard on first deploy. Never committed.
@@ -19,10 +17,6 @@ envVarGroups:
       - key: TELEGRAM_BOT_USERNAME
         sync: false
       - key: NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
-        sync: false
-      - key: VOUCHER_SIGNER_PRIVATE_KEY
-        sync: false
-      - key: RELAYER_PRIVATE_KEY
         sync: false
       - key: AI_API_KEY
         sync: false
@@ -41,7 +35,7 @@ services:
     # Same AWS region as the Neon project (aws-us-east-2, Ohio).
     region: ohio
     plan: starter
-    # One instance only: the relayer orders its nonces in-process.
+    # One instance: rate limits are kept in memory.
     numInstances: 1
     buildCommand: npm install -g bun@1.3.10 && bun install --frozen-lockfile && bun run build
     # Migrates Neon over DATABASE_URL_UNPOOLED (drizzle.config.ts).

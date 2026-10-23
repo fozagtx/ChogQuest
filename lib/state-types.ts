@@ -52,5 +52,5 @@ export type AppState = {
     xpReward: number
     chogQuest: { name: string; done: boolean } | null
   }
-  chronicle: { enabled: boolean; address: string }
+  chronicle: { address: string }
 }

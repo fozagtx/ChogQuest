@@ -146,8 +146,8 @@ export function TheNight() {
             Your Chog is up to something.
           </h2>
           <p className="text-lg font-semibold text-white/65">
-            Every night it sneaks out and comes home with a diary page and up to three souvenirs. Claim them in one tap,
-            gas free, before the end of the next day. Miss it and they slip into Lost and Found.
+            Every night it sneaks out and comes home with a diary page and up to three souvenirs. Claim them from your wallet
+            before the end of the next day. Miss it and they slip into Lost and Found.
           </p>
           <div className="flex flex-wrap gap-2.5">
             {counts.map((c) => (

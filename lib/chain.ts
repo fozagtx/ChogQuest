@@ -1,17 +1,6 @@
 import "server-only"
 
-import {
-  createPublicClient,
-  createWalletClient,
-  encodePacked,
-  getAddress,
-  http,
-  keccak256,
-  parseAbi,
-  type Address,
-  type Hex,
-} from "viem"
-import { privateKeyToAccount } from "viem/accounts"
+import { createPublicClient, decodeEventLog, getAddress, http, parseAbi, type Address, type Hex } from "viem"
 
 import { env } from "@/lib/env"
 
@@ -24,10 +13,11 @@ const erc721Abi = parseAbi([
 ])
 
 export const chronicleAbi = parseAbi([
-  "function claimNight(uint256 tokenId, uint32 day, uint16[] itemIds, uint32 xpGain, uint32 streak, uint256 deadline, bytes signature)",
-  "function chronicleOf(uint256 tokenId) view returns (uint64 xp, uint32 level, uint32 streak, uint32 lastClaimDay, bool hasClaimed)",
+  "function claimNight(uint256 tokenId, uint32 day) returns (uint16[] itemIds)",
+  "function rollNight(uint256 tokenId, uint32 day) pure returns (uint16[] ids)",
+  "function chronicleOf(uint256 tokenId) view returns (uint64 xp, uint32 level, uint32 streak, uint32 lastClaimDay, bool claimed)",
   "function itemCount(uint256 tokenId, uint16 itemId) view returns (uint32)",
-  "event NightClaimed(uint256 indexed tokenId, uint32 indexed day, uint16[] itemIds, uint32 xpGain, uint64 newXp, uint32 newLevel, uint32 streak)",
+  "event NightClaimed(uint256 indexed tokenId, uint32 indexed day, address indexed holder, uint16[] itemIds, uint64 newXp, uint32 newLevel, uint32 streak)",
 ])
 
 function chogClient() {
@@ -181,99 +171,53 @@ export async function chogMetadata(tokenId: number): Promise<ChogMeta> {
   return meta
 }
 
-// ---------- Chronicle ----------
+// ---------- Chronicle (read only: players claim from their own wallets) ----------
 
-export type Voucher = {
-  tokenId: bigint
-  day: number
-  itemIds: number[]
-  xpGain: number
-  streak: number
-  deadline: bigint
-}
-
-const voucherTypes = {
-  NightVoucher: [
-    { name: "tokenId", type: "uint256" },
-    { name: "day", type: "uint32" },
-    { name: "itemsHash", type: "bytes32" },
-    { name: "xpGain", type: "uint32" },
-    { name: "streak", type: "uint32" },
-    { name: "deadline", type: "uint256" },
-  ],
-} as const
-
-export function itemsHash(itemIds: number[]): Hex {
-  return keccak256(encodePacked(["uint16[]"], [itemIds]))
-}
-
-let cachedChainId: number | undefined
-async function chainId() {
-  cachedChainId ??= await monadClient().getChainId()
-  return cachedChainId
-}
-
-export async function signVoucher(v: Voucher): Promise<Hex> {
-  const signer = privateKeyToAccount(env.voucherSignerKey()!)
-  return signer.signTypedData({
-    domain: {
-      name: "QuestChogChronicle",
-      version: "1",
-      chainId: await chainId(),
-      verifyingContract: env.chronicleAddress()!,
-    },
-    types: voucherTypes,
-    primaryType: "NightVoucher",
-    message: {
-      tokenId: v.tokenId,
-      day: v.day,
-      itemsHash: itemsHash(v.itemIds),
-      xpGain: v.xpGain,
-      streak: v.streak,
-      deadline: v.deadline,
-    },
+/** The night's items, rolled by the contract itself from (tokenId, day). */
+export async function rollNightOnChain(tokenId: number, dayNumber: number): Promise<number[]> {
+  const ids = await monadClient().readContract({
+    address: env.chronicleAddress(),
+    abi: chronicleAbi,
+    functionName: "rollNight",
+    args: [BigInt(tokenId), dayNumber],
   })
+  return ids.map(Number)
 }
 
-// Single web instance, so an in-process queue keeps relayer nonces in order.
-let relayQueue: Promise<unknown> = Promise.resolve()
+export type VerifiedClaim = { tokenId: number; day: number; holder: Address; itemIds: number[]; txHash: Hex }
 
-/** Relayer submits the signed claim and waits for the receipt. Returns the tx hash. */
-export function relayClaim(v: Voucher, signature: Hex): Promise<Hex> {
-  const run = async () => {
-    const account = privateKeyToAccount(env.relayerKey()!)
-    const transport = http(env.monadRpcUrl)
-    const id = await chainId()
-    const chain = {
-      id,
-      name: "monad",
-      nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
-      rpcUrls: { default: { http: [env.monadRpcUrl] } },
+/**
+ * Confirms a claim transaction succeeded on Chronicle and returns its NightClaimed event.
+ * The contract already checked the holder owns the Chog, so the server needs no key.
+ */
+export async function verifyClaimTx(txHash: Hex): Promise<VerifiedClaim | null> {
+  const receipt = await monadClient().waitForTransactionReceipt({ hash: txHash, timeout: 60_000 })
+  if (receipt.status !== "success") return null
+  const chronicle = getAddress(env.chronicleAddress())
+  for (const log of receipt.logs) {
+    if (getAddress(log.address) !== chronicle) continue
+    try {
+      const ev = decodeEventLog({ abi: chronicleAbi, eventName: "NightClaimed", data: log.data, topics: log.topics })
+      return {
+        tokenId: Number(ev.args.tokenId),
+        day: ev.args.day,
+        holder: getAddress(ev.args.holder),
+        itemIds: ev.args.itemIds.map(Number),
+        txHash,
+      }
+    } catch {
+      // not a NightClaimed log
     }
-    const wallet = createWalletClient({ account, chain, transport })
-    const hash = await wallet.writeContract({
-      address: env.chronicleAddress()!,
-      abi: chronicleAbi,
-      functionName: "claimNight",
-      args: [v.tokenId, v.day, v.itemIds, v.xpGain, v.streak, v.deadline, signature],
-    })
-    const receipt = await monadClient().waitForTransactionReceipt({ hash, timeout: 60_000 })
-    if (receipt.status !== "success") throw new Error(`claim tx reverted: ${hash}`)
-    return hash
   }
-  const next = relayQueue.then(run, run)
-  relayQueue = next.catch(() => undefined)
-  return next
+  return null
 }
 
 export async function chronicleOf(tokenId: number) {
-  const address = env.chronicleAddress()
-  if (!address) return null
-  const [xp, level, streak, lastClaimDay, hasClaimed] = await monadClient().readContract({
-    address,
+  const [xp, level, streak, lastClaimDay, claimed] = await monadClient().readContract({
+    address: env.chronicleAddress(),
     abi: chronicleAbi,
     functionName: "chronicleOf",
     args: [BigInt(tokenId)],
   })
-  return { xp: Number(xp), level, streak, lastClaimDay, hasClaimed }
+  return { xp: Number(xp), level, streak, lastClaimDay, claimed }
 }

@@ -15,6 +15,10 @@ export function dayNumber(day: string): number {
   return Math.floor(Date.parse(`${day}T00:00:00Z`) / DAY_MS)
 }
 
+export function dayFromNumber(n: number): string {
+  return new Date(n * DAY_MS).toISOString().slice(0, 10)
+}
+
 export function startOfDay(day: string): Date {
   return new Date(`${day}T00:00:00Z`)
 }

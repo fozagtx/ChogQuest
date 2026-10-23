@@ -3,32 +3,36 @@ pragma solidity ^0.8.24;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /// @title Chronicle
-/// @notice Public, append-only record of each Chog's nightly progress in the Quest Chog game.
-///         Every Chog NFT token ID has an XP total, a level, a streak, the last day it claimed,
-///         and an inventory of item counts. The contract holds no funds and mints no tokens.
-/// @dev Progress is written through EIP-712 vouchers signed by a trusted off-chain `signer`.
-///      `claimNight` does NOT check `msg.sender`: anyone (typically a gas-paying relayer) may
-///      submit a voucher. Ownership of the Chog NFT is verified server-side before the voucher
-///      is signed, so the signer is a trusted party. Replay is prevented by requiring the
-///      voucher's `day` to be strictly greater than the token's last claimed day.
-contract Chronicle is Ownable, Pausable, EIP712 {
-    /// @notice XP required per level. level = 1 + xp / LEVEL_XP.
+/// @notice Public record of each Chog's nights in Quest Chog. Every Chog token ID has an XP
+///         total, a level, a claim streak, the last day it claimed, and an item inventory.
+///         The contract holds no funds and mints no tokens.
+/// @dev No trusted signer or relayer: the Chog's current holder calls `claimNight` from their
+///      own wallet, the contract checks ownership on the Chog NFT, and it rolls the night's
+///      items itself from (tokenId, day). The roll is public and deterministic, so the app shows
+///      the same items before the claim by calling `rollNight`. Days are UTC days since the
+///      unix epoch. A night can be claimed on its day or the day after.
+contract Chronicle is Ownable, Pausable {
+    /// @notice XP added per claimed night.
+    uint64 public constant CLAIM_XP = 40;
+    /// @notice XP per level. level = 1 + xp / LEVEL_XP.
     uint64 public constant LEVEL_XP = 500;
+    /// @notice About 1 in EPIC_ODDS nights brings back an EPIC item.
+    uint256 public constant EPIC_ODDS = 12;
+    /// @notice Chance (percent) that a non-epic item is RARE.
+    uint256 public constant RARE_PERCENT = 25;
 
-    /// @notice Maximum number of items a single night voucher may grant.
-    uint256 public constant MAX_ITEMS_PER_CLAIM = 3;
+    // Item ids by rarity. Must match lib/items.ts in the app. Never renumber, only append.
+    uint16 private constant COMMON_FIRST = 1;
+    uint16 private constant COMMON_COUNT = 12;
+    uint16 private constant RARE_FIRST = 13;
+    uint16 private constant RARE_COUNT = 6;
+    uint16 private constant EPIC_FIRST = 19;
+    uint16 private constant EPIC_COUNT = 3;
 
-    /// @notice EIP-712 typehash for the night voucher.
-    bytes32 public constant NIGHT_VOUCHER_TYPEHASH = keccak256(
-        "NightVoucher(uint256 tokenId,uint32 day,bytes32 itemsHash,uint32 xpGain,uint32 streak,uint256 deadline)"
-    );
-
-    /// @dev Packed into a single storage slot (8 + 4 + 4 + 4 + 1 bytes).
+    /// @dev Packed into one storage slot.
     struct Record {
         uint64 xp;
         uint32 level;
@@ -37,11 +41,8 @@ contract Chronicle is Ownable, Pausable, EIP712 {
         bool claimed;
     }
 
-    /// @notice Address whose signatures authorize night claims.
-    address public signer;
-
-    /// @notice Upper bound on `xpGain` for a single claim.
-    uint32 public maxXpPerClaim;
+    /// @notice The Chog NFT collection whose holders may claim.
+    IERC721 public immutable chog;
 
     mapping(uint256 tokenId => Record) private _records;
     mapping(uint256 tokenId => mapping(uint16 itemId => uint32 count)) private _inventory;
@@ -49,169 +50,109 @@ contract Chronicle is Ownable, Pausable, EIP712 {
     event NightClaimed(
         uint256 indexed tokenId,
         uint32 indexed day,
+        address indexed holder,
         uint16[] itemIds,
-        uint32 xpGain,
         uint64 newXp,
         uint32 newLevel,
         uint32 streak
     );
-    event SignerUpdated(address indexed previousSigner, address indexed newSigner);
-    event MaxXpPerClaimUpdated(uint32 previousMax, uint32 newMax);
 
-    error ZeroAddress();
-    error VoucherExpired(uint256 deadline);
-    error InvalidItemCount(uint256 count);
-    error XpGainTooHigh(uint32 xpGain, uint32 maxXpPerClaim);
-    error InvalidSignature();
-    error DayAlreadyClaimed(uint32 day, uint32 lastClaimDay);
+    error NotChogHolder();
+    error DayNotClaimable();
+    error AlreadyClaimed();
 
-    /// @param initialOwner Admin able to rotate the signer, pause, and set the XP cap.
-    /// @param initialSigner Trusted voucher signer (the game server key).
-    /// @param initialMaxXpPerClaim Cap on XP granted per claim.
-    constructor(address initialOwner, address initialSigner, uint32 initialMaxXpPerClaim)
-        Ownable(initialOwner)
-        EIP712("QuestChogChronicle", "1")
-    {
-        if (initialSigner == address(0)) revert ZeroAddress();
-        signer = initialSigner;
-        maxXpPerClaim = initialMaxXpPerClaim;
-        emit SignerUpdated(address(0), initialSigner);
-        emit MaxXpPerClaimUpdated(0, initialMaxXpPerClaim);
+    constructor(address initialOwner, IERC721 chogNft) Ownable(initialOwner) {
+        chog = chogNft;
     }
 
-    // ---------------------------------------------------------------------
-    // Claims
-    // ---------------------------------------------------------------------
+    /// @notice Current UTC day number.
+    function today() public view returns (uint32) {
+        return uint32(block.timestamp / 1 days);
+    }
 
-    /// @notice Record one night of progress for a Chog.
-    /// @dev Callable by anyone (relayer). The caller is intentionally not checked: the server
-    ///      verifies NFT ownership before signing, and the voucher binds every field.
-    ///      At most one claim per token per day; days must strictly increase, which also
-    ///      makes every voucher single-use.
-    /// @param tokenId Chog NFT token ID.
-    /// @param day Days since unix epoch (UTC) this night belongs to.
-    /// @param itemIds Items found this night (1 to 3 entries; duplicates allowed and counted).
-    /// @param xpGain XP earned this night (must be <= maxXpPerClaim).
-    /// @param streak New streak value computed by the server.
-    /// @param deadline Unix timestamp after which the voucher is invalid.
-    /// @param signature EIP-712 signature by `signer` over the NightVoucher.
-    function claimNight(
-        uint256 tokenId,
-        uint32 day,
-        uint16[] calldata itemIds,
-        uint32 xpGain,
-        uint32 streak,
-        uint256 deadline,
-        bytes calldata signature
-    ) external whenNotPaused {
-        if (block.timestamp > deadline) revert VoucherExpired(deadline);
-        uint256 n = itemIds.length;
-        if (n == 0 || n > MAX_ITEMS_PER_CLAIM) revert InvalidItemCount(n);
-        if (xpGain > maxXpPerClaim) revert XpGainTooHigh(xpGain, maxXpPerClaim);
+    /// @notice Claim a Chog's night. Only the Chog's current holder can call it.
+    /// @param tokenId Chog token ID.
+    /// @param day The night's day: today, or yesterday if it was not claimed yet.
+    function claimNight(uint256 tokenId, uint32 day) external whenNotPaused returns (uint16[] memory itemIds) {
+        if (chog.ownerOf(tokenId) != msg.sender) revert NotChogHolder();
+        uint32 t = today();
+        if (day != t && day + 1 != t) revert DayNotClaimable();
 
         Record storage r = _records[tokenId];
-        if (r.claimed && day <= r.lastClaimDay) revert DayAlreadyClaimed(day, r.lastClaimDay);
+        if (r.claimed && day <= r.lastClaimDay) revert AlreadyClaimed();
 
-        _verify(hashVoucher(tokenId, day, itemIds, xpGain, streak, deadline), signature);
+        itemIds = rollNight(tokenId, day);
+        mapping(uint16 => uint32) storage inv = _inventory[tokenId];
+        for (uint256 i; i < itemIds.length; i++) {
+            inv[itemIds[i]] += 1;
+        }
 
-        (uint64 newXp, uint32 newLevel) = _record(r, day, xpGain, streak);
-        _addItems(tokenId, itemIds);
-
-        emit NightClaimed(tokenId, day, itemIds, xpGain, newXp, newLevel, streak);
-    }
-
-    function _verify(bytes32 digest, bytes calldata signature) private view {
-        (address recovered, ECDSA.RecoverError err,) = ECDSA.tryRecover(digest, signature);
-        if (err != ECDSA.RecoverError.NoError || recovered != signer) revert InvalidSignature();
-    }
-
-    function _record(Record storage r, uint32 day, uint32 xpGain, uint32 streak)
-        private
-        returns (uint64 newXp, uint32 newLevel)
-    {
-        newXp = r.xp + xpGain;
-        newLevel = SafeCast.toUint32(1 + newXp / LEVEL_XP);
-        r.xp = newXp;
-        r.level = newLevel;
-        r.streak = streak;
+        r.streak = (r.claimed && r.lastClaimDay + 1 == day) ? r.streak + 1 : 1;
+        r.xp += CLAIM_XP;
+        r.level = uint32(1 + r.xp / LEVEL_XP);
         r.lastClaimDay = day;
         r.claimed = true;
+
+        emit NightClaimed(tokenId, day, msg.sender, itemIds, r.xp, r.level, r.streak);
     }
 
-    function _addItems(uint256 tokenId, uint16[] calldata itemIds) private {
-        mapping(uint16 => uint32) storage inv = _inventory[tokenId];
-        uint256 n = itemIds.length;
-        for (uint256 i; i < n; ++i) {
-            inv[itemIds[i]] += 1;
+    /// @notice The items a Chog brings back on a given night: 1 to 3 distinct item ids.
+    function rollNight(uint256 tokenId, uint32 day) public pure returns (uint16[] memory ids) {
+        bytes32 seed = keccak256(abi.encode(tokenId, day));
+        uint256 count = 1 + (_rand(seed, 0) % 3);
+        bool epicNight = _rand(seed, 1) % EPIC_ODDS == 0;
+
+        ids = new uint16[](count);
+        for (uint256 k; k < count; k++) {
+            uint16 first;
+            uint16 size;
+            if (epicNight && k == 0) {
+                (first, size) = (EPIC_FIRST, EPIC_COUNT);
+            } else if (_rand(seed, 2 + 2 * k) % 100 < RARE_PERCENT) {
+                (first, size) = (RARE_FIRST, RARE_COUNT);
+            } else {
+                (first, size) = (COMMON_FIRST, COMMON_COUNT);
+            }
+            uint16 offset = uint16(_rand(seed, 3 + 2 * k) % size);
+            // Keep a night's items distinct. Pools hold at least 3 items, so this ends.
+            while (_contains(ids, k, first + offset)) {
+                offset = (offset + 1) % size;
+            }
+            ids[k] = first + offset;
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Admin
-    // ---------------------------------------------------------------------
-
-    /// @notice Rotate the voucher signer. Outstanding vouchers from the old signer stop working.
-    function setSigner(address newSigner) external onlyOwner {
-        if (newSigner == address(0)) revert ZeroAddress();
-        emit SignerUpdated(signer, newSigner);
-        signer = newSigner;
-    }
-
-    /// @notice Set the per-claim XP cap.
-    function setMaxXpPerClaim(uint32 newMax) external onlyOwner {
-        emit MaxXpPerClaimUpdated(maxXpPerClaim, newMax);
-        maxXpPerClaim = newMax;
-    }
-
-    /// @notice Halt all claims.
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @notice Resume claims.
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
-    // ---------------------------------------------------------------------
-    // Reads
-    // ---------------------------------------------------------------------
-
-    /// @notice Full chronicle for a Chog. `level` is 0 until the first claim.
+    /// @notice A Chog's record. `claimed` is false until its first claim.
     function chronicleOf(uint256 tokenId)
         external
         view
-        returns (uint64 xp, uint32 level, uint32 streak, uint32 lastClaimDay, bool hasClaimed)
+        returns (uint64 xp, uint32 level, uint32 streak, uint32 lastClaimDay, bool claimed)
     {
         Record memory r = _records[tokenId];
         return (r.xp, r.level, r.streak, r.lastClaimDay, r.claimed);
     }
 
-    /// @notice How many of `itemId` the Chog has collected.
+    /// @notice How many of an item a Chog has collected.
     function itemCount(uint256 tokenId, uint16 itemId) external view returns (uint32) {
         return _inventory[tokenId][itemId];
     }
 
-    /// @notice EIP-712 digest a signer must sign for the given voucher fields.
-    /// @dev itemsHash = keccak256(abi.encodePacked(itemIds)). Note: Solidity pads array elements
-    ///      to 32 bytes inside encodePacked, so this equals keccak256 of the concatenated
-    ///      32-byte big-endian words (viem: keccak256(encodePacked(["uint16[]"], [itemIds]))).
-    function hashVoucher(
-        uint256 tokenId,
-        uint32 day,
-        uint16[] calldata itemIds,
-        uint32 xpGain,
-        uint32 streak,
-        uint256 deadline
-    ) public view returns (bytes32) {
-        bytes32 itemsHash = keccak256(abi.encodePacked(itemIds));
-        bytes32 structHash =
-            keccak256(abi.encode(NIGHT_VOUCHER_TYPEHASH, tokenId, day, itemsHash, xpGain, streak, deadline));
-        return _hashTypedDataV4(structHash);
+    function pause() external onlyOwner {
+        _pause();
     }
 
-    /// @notice EIP-712 domain separator for this deployment.
-    function domainSeparator() external view returns (bytes32) {
-        return _domainSeparatorV4();
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function _rand(bytes32 seed, uint256 i) private pure returns (uint256) {
+        return uint256(keccak256(abi.encode(seed, i)));
+    }
+
+    function _contains(uint16[] memory ids, uint256 len, uint16 id) private pure returns (bool) {
+        for (uint256 i; i < len; i++) {
+            if (ids[i] == id) return true;
+        }
+        return false;
     }
 }

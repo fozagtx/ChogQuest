@@ -8,17 +8,38 @@
         "internalType": "address"
       },
       {
-        "name": "initialSigner",
+        "name": "chogNft",
         "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "initialMaxXpPerClaim",
-        "type": "uint32",
-        "internalType": "uint32"
+        "internalType": "contract IERC721"
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "CLAIM_XP",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "EPIC_ODDS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -35,7 +56,7 @@
   },
   {
     "type": "function",
-    "name": "MAX_ITEMS_PER_CLAIM",
+    "name": "RARE_PERCENT",
     "inputs": [],
     "outputs": [
       {
@@ -48,13 +69,13 @@
   },
   {
     "type": "function",
-    "name": "NIGHT_VOUCHER_TYPEHASH",
+    "name": "chog",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "address",
+        "internalType": "contract IERC721"
       }
     ],
     "stateMutability": "view"
@@ -91,7 +112,7 @@
         "internalType": "uint32"
       },
       {
-        "name": "hasClaimed",
+        "name": "claimed",
         "type": "bool",
         "internalType": "bool"
       }
@@ -111,135 +132,16 @@
         "name": "day",
         "type": "uint32",
         "internalType": "uint32"
-      },
+      }
+    ],
+    "outputs": [
       {
         "name": "itemIds",
         "type": "uint16[]",
         "internalType": "uint16[]"
-      },
-      {
-        "name": "xpGain",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "streak",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "signature",
-        "type": "bytes",
-        "internalType": "bytes"
       }
     ],
-    "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "domainSeparator",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "eip712Domain",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "fields",
-        "type": "bytes1",
-        "internalType": "bytes1"
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "version",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "verifyingContract",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "salt",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "extensions",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "hashVoucher",
-    "inputs": [
-      {
-        "name": "tokenId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "day",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "itemIds",
-        "type": "uint16[]",
-        "internalType": "uint16[]"
-      },
-      {
-        "name": "xpGain",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "streak",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -256,19 +158,6 @@
         "internalType": "uint16"
       }
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "maxXpPerClaim",
-    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -320,39 +209,37 @@
   },
   {
     "type": "function",
-    "name": "setMaxXpPerClaim",
+    "name": "rollNight",
     "inputs": [
       {
-        "name": "newMax",
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "day",
         "type": "uint32",
         "internalType": "uint32"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setSigner",
-    "inputs": [
+    "outputs": [
       {
-        "name": "newSigner",
-        "type": "address",
-        "internalType": "address"
+        "name": "ids",
+        "type": "uint16[]",
+        "internalType": "uint16[]"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
-    "name": "signer",
+    "name": "today",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "address",
-        "internalType": "address"
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "view"
@@ -379,31 +266,6 @@
   },
   {
     "type": "event",
-    "name": "EIP712DomainChanged",
-    "inputs": [],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "MaxXpPerClaimUpdated",
-    "inputs": [
-      {
-        "name": "previousMax",
-        "type": "uint32",
-        "indexed": false,
-        "internalType": "uint32"
-      },
-      {
-        "name": "newMax",
-        "type": "uint32",
-        "indexed": false,
-        "internalType": "uint32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "NightClaimed",
     "inputs": [
       {
@@ -419,16 +281,16 @@
         "internalType": "uint32"
       },
       {
+        "name": "holder",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "itemIds",
         "type": "uint16[]",
         "indexed": false,
         "internalType": "uint16[]"
-      },
-      {
-        "name": "xpGain",
-        "type": "uint32",
-        "indexed": false,
-        "internalType": "uint32"
       },
       {
         "name": "newXp",
@@ -485,25 +347,6 @@
   },
   {
     "type": "event",
-    "name": "SignerUpdated",
-    "inputs": [
-      {
-        "name": "previousSigner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "newSigner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "Unpaused",
     "inputs": [
       {
@@ -517,19 +360,13 @@
   },
   {
     "type": "error",
-    "name": "DayAlreadyClaimed",
-    "inputs": [
-      {
-        "name": "day",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "lastClaimDay",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
-    ]
+    "name": "AlreadyClaimed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DayNotClaimable",
+    "inputs": []
   },
   {
     "type": "error",
@@ -543,23 +380,7 @@
   },
   {
     "type": "error",
-    "name": "InvalidItemCount",
-    "inputs": [
-      {
-        "name": "count",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidShortString",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSignature",
+    "name": "NotChogHolder",
     "inputs": []
   },
   {
@@ -583,64 +404,5 @@
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "SafeCastOverflowedUintDowncast",
-    "inputs": [
-      {
-        "name": "bits",
-        "type": "uint8",
-        "internalType": "uint8"
-      },
-      {
-        "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "StringTooLong",
-    "inputs": [
-      {
-        "name": "str",
-        "type": "string",
-        "internalType": "string"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "VoucherExpired",
-    "inputs": [
-      {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "XpGainTooHigh",
-    "inputs": [
-      {
-        "name": "xpGain",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "maxXpPerClaim",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ZeroAddress",
-    "inputs": []
   }
 ]

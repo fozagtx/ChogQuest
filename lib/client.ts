@@ -1,6 +1,20 @@
 "use client"
 
-import { createWalletClient, custom, getAddress, type Address } from "viem"
+import {
+  BaseError,
+  ContractFunctionRevertedError,
+  createPublicClient,
+  createWalletClient,
+  custom,
+  defineChain,
+  getAddress,
+  http,
+  parseAbi,
+  type Address,
+  type Hex,
+} from "viem"
+
+import { MONAD_TESTNET } from "@/lib/contracts"
 
 // Browser helpers: API calls and the injected wallet (EIP-1193).
 
@@ -52,6 +66,84 @@ export async function signIn() {
   return api<{ address: Address; activeChog: number | null }>("/api/auth/verify", {
     body: { message, signature },
   })
+}
+
+// ---------- claiming on-chain from the player's wallet ----------
+
+const monadTestnet = defineChain({
+  id: MONAD_TESTNET.chainId,
+  name: "Monad Testnet",
+  nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
+  rpcUrls: { default: { http: [MONAD_TESTNET.rpcUrl] } },
+  blockExplorers: { default: { name: "Monadscan", url: MONAD_TESTNET.explorer } },
+})
+
+const claimAbi = parseAbi([
+  "function claimNight(uint256 tokenId, uint32 day) returns (uint16[] itemIds)",
+  "error NotChogHolder()",
+  "error DayNotClaimable()",
+  "error AlreadyClaimed()",
+  "error EnforcedPause()",
+])
+
+const revertMessages: Record<string, string> = {
+  NotChogHolder: "This wallet does not hold that Chog.",
+  DayNotClaimable: "This night can no longer be claimed.",
+  AlreadyClaimed: "Already claimed. Safe in your Chronicle.",
+  EnforcedPause: "Claims are paused for a moment. Try again later.",
+}
+
+async function switchToMonadTestnet() {
+  const chainId = `0x${MONAD_TESTNET.chainId.toString(16)}`
+  try {
+    await provider().request({ method: "wallet_switchEthereumChain", params: [{ chainId }] })
+  } catch (err) {
+    // 4902: the wallet does not know the network yet.
+    if ((err as { code?: number }).code !== 4902) throw err
+    await provider().request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          chainId,
+          chainName: "Monad Testnet",
+          nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
+          rpcUrls: [MONAD_TESTNET.rpcUrl],
+          blockExplorerUrls: [MONAD_TESTNET.explorer],
+        },
+      ],
+    })
+  }
+}
+
+/** Sends Chronicle.claimNight from the connected wallet and waits for it to land. */
+export async function claimOnChain(chronicle: Address, tokenId: number, day: number): Promise<Hex> {
+  const account = await connectWallet()
+  await switchToMonadTestnet()
+  const wallet = createWalletClient({ account, chain: monadTestnet, transport: custom(provider()) })
+  const reader = createPublicClient({ chain: monadTestnet, transport: http() })
+  try {
+    const { request } = await reader.simulateContract({
+      account,
+      address: chronicle,
+      abi: claimAbi,
+      functionName: "claimNight",
+      args: [BigInt(tokenId), day],
+    })
+    const hash = await wallet.writeContract(request)
+    const receipt = await reader.waitForTransactionReceipt({ hash })
+    if (receipt.status !== "success") throw new Error("The claim transaction failed.")
+    return hash
+  } catch (err) {
+    if (err instanceof BaseError) {
+      const revert = err.walk((e) => e instanceof ContractFunctionRevertedError)
+      const name = revert instanceof ContractFunctionRevertedError ? revert.data?.errorName : undefined
+      if (name && revertMessages[name]) throw new Error(revertMessages[name])
+      if (/insufficient funds/i.test(err.message)) {
+        throw new Error("This wallet needs a little testnet MON for gas. Get some at faucet.monad.xyz.")
+      }
+    }
+    throw err
+  }
 }
 
 export function errorMessage(err: unknown) {

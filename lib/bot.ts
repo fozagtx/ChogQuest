@@ -2,14 +2,12 @@ import "server-only"
 
 import { and, eq, gt, isNull } from "drizzle-orm"
 
-import { HttpError } from "@/lib/api"
 import { getDb, schema } from "@/lib/db"
 import { env } from "@/lib/env"
-import { claimNight } from "@/lib/game"
 import { answerCallback, sendMessage } from "@/lib/telegram"
 
-// The bot does two things: link a wallet with /start CODE, and handle the
-// Claim and Mute buttons on the evening nudge. Everything else lives in the app.
+// The bot does two things: link a wallet with /start CODE, and handle the Mute
+// button on the evening nudge. Claiming happens in the app, from the player's wallet.
 
 const { users, linkCodes, telegramUpdates } = schema
 
@@ -79,23 +77,12 @@ async function handleCallback(cb: TgCallback) {
   const [user] = await getDb().select().from(users).where(eq(users.telegramId, cb.from.id))
   const chatId = cb.message?.chat.id
   if (!user || !chatId) return answerCallback(cb.id, "Link your wallet in the app first.")
-  const [action, day] = (cb.data ?? "").split(":")
+  const action = cb.data ?? ""
 
   if (action === "mute") {
     await getDb().update(users).set({ telegramMuted: true }).where(eq(users.id, user.id))
     await answerCallback(cb.id, "Muted")
     return sendMessage(chatId, "No more nudges. Link Telegram again in the app to turn them back on.")
-  }
-
-  if (action === "claim") {
-    try {
-      const res = await claimNight(user, "telegram", day || undefined)
-      await answerCallback(cb.id, "Claimed")
-      return sendMessage(chatId, `Claimed. +${res.xpGain} XP. Streak ${res.streak}.`)
-    } catch (err) {
-      if (err instanceof HttpError) return answerCallback(cb.id, err.message.slice(0, 190))
-      throw err
-    }
   }
 
   return answerCallback(cb.id)
