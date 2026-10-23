@@ -36,11 +36,12 @@ Built for Chogathon 2026.
 | `lib/narrate.ts` | The only AI call. It writes the diary title and text from the roll. It never decides numbers |
 | `lib/game.ts` | Goals, check-ins, nights, claims, app state |
 | `lib/chain.ts` | Chog NFT reads (`ownerOf`, `tokenURI`), EIP-712 voucher signing, relayer |
-| `lib/bot.ts`, `app/api/telegram` | Telegram bot: `/start CODE`, `/night`, `/goals`, `/mute`, inline Claim / Check in / Remind me later / Mute |
-| `lib/cron.ts` | Morning (generate nights, morning message) and evening (one nudge, quiet hours, mute) |
+| `lib/bot.ts`, `app/api/telegram` | Telegram bot: link with `/start CODE`, then Claim and Mute buttons on the evening nudge |
+| `lib/cron.ts` | Evening job: one Telegram nudge per linked player when tonight's items are unclaimed |
+| `neon.ts`, `functions/scheduler.ts` | Neon backend: Postgres, AI Gateway, and the scheduler Function with its cron triggers |
 | `contracts/` | Foundry project with `Chronicle.sol`, 21 tests, deploy script |
 | `scripts/smoke.ts` | End-to-end check of the API with a real wallet key |
-| `render.yaml` | Render Blueprint: web service, Postgres, two cron jobs, env group |
+| `render.yaml` | Render Blueprint for the web service and its env group |
 
 ## Trust model
 
@@ -110,20 +111,31 @@ export MAX_XP_PER_CLAIM=1000          # must match MAX_XP_PER_CLAIM in lib/xp.ts
 forge script script/Deploy.s.sol:Deploy --rpc-url monad_testnet --broadcast
 ```
 
-### 2. Render
+### 2. Neon (database, scheduler, AI Gateway)
 
-1. Push the repo and create a Blueprint from `render.yaml`.
-2. Fill in the `sync: false` values when prompted: Telegram token and username, signer and relayer keys, AI key, `CHOG_NFT_ADDRESS`, `CHRONICLE_ADDRESS`, `APP_URL` (the web service URL), and `CHOG_RPC_URL` if the NFT is on a different network than Chronicle.
-3. Send the relayer address a small amount of MON for gas.
-4. Register the bot webhook once:
+`neon.ts` declares the backend on Neon: Lakebase Postgres, the AI Gateway for diary narration, and a `scheduler` Function with one Function Trigger (`0 19 * * *` UTC). The scheduler verifies each delivery came from Neon, then calls `APP_URL/api/cron/evening` with `x-cron-secret`. Diary pages are generated when a player opens the app, or by the evening job.
+
+```bash
+neon login
+neon deploy --env .env.local     # provisions services, deploys the function, pulls DATABASE_URL and gateway vars
+bun run db:migrate               # uses DATABASE_URL_UNPOOLED (direct connection)
+```
+
+The app uses the pooled `DATABASE_URL` with `postgres.js` (prepared statements off for PgBouncer). AI narration is optional: with AI Gateway credits on the Neon org (or an `AI_API_KEY`) the diary is AI-written, otherwise the built-in template writes it.
+
+### 3. Render (web app)
+
+1. Push the repo and create a Blueprint from `render.yaml`. It runs one web service in Ohio, next to the Neon project in `aws-us-east-2`.
+2. Fill in the `sync: false` values: the Neon `DATABASE_URL`, `DATABASE_URL_UNPOOLED` and gateway vars, signer and relayer keys, `CHOG_NFT_ADDRESS` (and `CHOG_RPC_URL` if the NFT is on another network), Telegram values, and `APP_URL`. `CRON_SECRET` must be the same value the Neon scheduler was deployed with.
+3. Set `APP_URL` in `.env.local` to the Render URL and run `neon deploy --env .env.local` again so the scheduler calls it.
+4. Send the relayer address a small amount of MON for gas.
+5. Register the bot webhook once:
 
 ```bash
 TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=<value from Render> APP_URL=https://... bun scripts/set-webhook.ts
 ```
 
-Notes from Render's docs (October 2026): a Free web service spins down after 15 minutes without traffic, which makes the first bot reply slow. The Blueprint uses the Starter plan for that reason. Each cron job has a minimum charge of $1 per month. Check current pricing before you deploy.
-
-Cron schedule (UTC): morning `0 7 * * *`, evening `0 19 * * *`. Both endpoints require the `x-cron-secret` header.
+Notes from Render's docs (October 2026): a Free web service spins down after 15 minutes without traffic, which makes the first bot reply slow, so the Blueprint uses the Starter plan. Check current pricing before you deploy.
 
 ## Testing instructions for judges
 
@@ -133,6 +145,6 @@ Cron schedule (UTC): morning `0 7 * * *`, evening `0 19 * * *`. Both endpoints r
 4. On **Today**, read last night's diary, press **CLAIM**, and see XP go up. The transaction hash appears under the button.
 5. Check in on your goal. Your Chog's quest moves too.
 6. **Chog** shows the inventory recorded against the token ID. **Share** saves cards as images.
-7. Optional: on **Chog**, press **LINK TELEGRAM**, send the code to the bot, confirm with your wallet, then send `/night`.
+7. Optional: on **Chog**, press **LINK TELEGRAM**, then **OPEN TELEGRAM** and press Start. In the evening the bot sends one message with a Claim button.
 
 $CHOG is never required to play.

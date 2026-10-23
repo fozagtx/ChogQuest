@@ -8,7 +8,6 @@ import {
   pgEnum,
   pgTable,
   serial,
-  smallint,
   text,
   timestamp,
   unique,
@@ -24,9 +23,6 @@ export const users = pgTable("users", {
   activeChogTokenId: bigint("active_chog_token_id", { mode: "number" }),
   telegramId: bigint("telegram_id", { mode: "number" }).unique(),
   telegramMuted: boolean("telegram_muted").notNull().default(false),
-  // Quiet hours in UTC (0-23). Null means no quiet hours.
-  quietStart: smallint("quiet_start"),
-  quietEnd: smallint("quiet_end"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -40,7 +36,6 @@ export const linkCodes = pgTable("link_codes", {
   userId: integer("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  telegramId: bigint("telegram_id", { mode: "number" }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true }),
 })

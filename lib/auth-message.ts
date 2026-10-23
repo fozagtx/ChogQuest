@@ -15,7 +15,3 @@ export function parseSignInMessage(message: string): { address: Address; nonce: 
   if (!address || !nonce || !isAddress(address)) return null
   return { address: getAddress(address), nonce }
 }
-
-export function telegramLinkMessage(address: string, telegramId: number, code: string) {
-  return `Link Telegram to Quest Chog.\n\nWallet: ${getAddress(address)}\nTelegram ID: ${telegramId}\nCode: ${code}`
-}

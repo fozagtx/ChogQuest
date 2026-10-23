@@ -1,9 +1,3 @@
-databases:
-  - name: questchog-db
-    databaseName: questchog
-    region: oregon
-    plan: basic-256mb
-
 envVarGroups:
   - name: questchog-secrets
     envVars:
@@ -14,11 +8,12 @@ envVarGroups:
         generateValue: true
       - key: NIGHT_SECRET
         generateValue: true
-      - key: CRON_SECRET
-        generateValue: true
       - key: TELEGRAM_WEBHOOK_SECRET
         generateValue: true
       # Entered in the dashboard on first deploy. Never committed.
+      # Must equal the CRON_SECRET the Neon scheduler function was deployed with.
+      - key: CRON_SECRET
+        sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_BOT_USERNAME
@@ -35,6 +30,15 @@ envVarGroups:
         sync: false
       - key: CHRONICLE_ADDRESS
         value: "0xb46cd62a826b94f07a507c5359f79f189200ec93"
+      # Neon (from .env.local after `neon deploy`, or the Neon console).
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_UNPOOLED
+        sync: false
+      - key: NEON_AI_GATEWAY_BASE_URL
+        sync: false
+      - key: NEON_AI_GATEWAY_TOKEN
+        sync: false
       - key: MONAD_RPC_URL
         value: https://testnet-rpc.monad.xyz
       - key: CHOG_RPC_URL
@@ -46,41 +50,17 @@ services:
   - type: web
     name: questchog
     runtime: node
-    region: oregon
+    # Same AWS region as the Neon project (aws-us-east-2, Ohio).
+    region: ohio
     plan: starter
     # One instance only: the relayer orders its nonces in-process.
     numInstances: 1
     buildCommand: npm install -g bun@1.3.10 && bun install --frozen-lockfile && bun run build
+    # Migrates Neon over DATABASE_URL_UNPOOLED (drizzle.config.ts).
     preDeployCommand: npx drizzle-kit migrate
     startCommand: npx next start -p $PORT
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: questchog-db
-          property: connectionString
       - key: NODE_VERSION
         value: "22"
-      - fromGroup: questchog-secrets
-
-  - type: cron
-    name: questchog-morning
-    runtime: node
-    region: oregon
-    plan: starter
-    schedule: "0 7 * * *"
-    buildCommand: echo "no build"
-    startCommand: 'curl -fsS -H "x-cron-secret: $CRON_SECRET" "$APP_URL/api/cron/morning"'
-    envVars:
-      - fromGroup: questchog-secrets
-
-  - type: cron
-    name: questchog-evening
-    runtime: node
-    region: oregon
-    plan: starter
-    schedule: "0 19 * * *"
-    buildCommand: echo "no build"
-    startCommand: 'curl -fsS -H "x-cron-secret: $CRON_SECRET" "$APP_URL/api/cron/evening"'
-    envVars:
       - fromGroup: questchog-secrets

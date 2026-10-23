@@ -44,6 +44,9 @@ export const env = {
   chronicleAddress: () => (optional("CHRONICLE_ADDRESS") ?? CHRONICLE.address) as `0x${string}`,
   voucherSignerKey: () => optional("VOUCHER_SIGNER_PRIVATE_KEY") as `0x${string}` | undefined,
   relayerKey: () => optional("RELAYER_PRIVATE_KEY") as `0x${string}` | undefined,
+  // Neon AI Gateway (pulled by `neon deploy`). AI_API_KEY is a direct-Anthropic fallback.
+  aiGatewayUrl: () => optional("NEON_AI_GATEWAY_BASE_URL"),
+  aiGatewayToken: () => optional("NEON_AI_GATEWAY_TOKEN"),
   aiApiKey: () => optional("AI_API_KEY"),
   aiModel: () => optional("AI_MODEL") ?? "claude-haiku-5-5",
   telegramBotToken: () => optional("TELEGRAM_BOT_TOKEN"),

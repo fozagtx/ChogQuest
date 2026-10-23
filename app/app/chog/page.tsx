@@ -6,7 +6,7 @@ import { useAppState } from "@/components/game/app-state"
 import { Gate } from "@/components/game/gate"
 import { NftImage } from "@/components/game/nft-image"
 import { rarityFill } from "@/components/game/rarity"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { api, errorMessage } from "@/lib/client"
 import { explorerAddress } from "@/lib/contracts"
@@ -118,7 +118,7 @@ export default function ChogSheet() {
               </section>
             )}
 
-            <TelegramLink linked={state.user.telegramLinked} />
+            <TelegramLink linked={state.user.telegramLinked} muted={state.user.telegramMuted} />
             <DeleteData />
           </>
         )
@@ -127,40 +127,50 @@ export default function ChogSheet() {
   )
 }
 
-function TelegramLink({ linked }: { linked: boolean }) {
+function TelegramLink({ linked, muted }: { linked: boolean; muted: boolean }) {
   const [code, setCode] = useState<{ code: string; url: string | null } | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  async function makeCode() {
+    try {
+      setCode(await api("/api/telegram/link-code", { method: "POST" }))
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
 
   return (
     <section className="flex flex-col gap-2 rounded-base border-2 border-border bg-secondary-background p-3 text-sm">
       <h2 className="font-pixel text-xs font-bold">TELEGRAM</h2>
-      {linked ? (
-        <p>Linked. Send /night to your bot for the diary and a claim button.</p>
+      {linked && !muted ? (
+        <p>Linked. Each evening the bot lets you know when your Chog&apos;s items are waiting, with a Claim button.</p>
       ) : code ? (
-        <>
-          <p>
-            Send <span className="font-pixel font-bold">/start {code.code}</span> to the Quest Chog bot. The code
-            works for 15 minutes.
-          </p>
-          {code.url && (
-            <a href={code.url} target="_blank" rel="noreferrer" className="font-bold underline">
-              Open the bot
+        code.url ? (
+          <>
+            <p>Open the bot and press Start. That links it. The link works for 15 minutes.</p>
+            <a
+              href={code.url}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants({ variant: "neutral" }), "w-full")}
+            >
+              OPEN TELEGRAM
             </a>
-          )}
-        </>
+          </>
+        ) : (
+          <p>
+            Send <span className="font-pixel font-bold">/start {code.code}</span> to the Quest Chog bot within 15
+            minutes.
+          </p>
+        )
       ) : (
         <>
-          <p>Get the nightly diary, a claim button and gentle nudges in Telegram.</p>
-          <Button
-            variant="neutral"
-            onClick={async () => {
-              try {
-                setCode(await api("/api/telegram/link-code", { method: "POST" }))
-              } catch (err) {
-                setError(errorMessage(err))
-              }
-            }}
-          >
+          <p>
+            {muted
+              ? "Nudges are muted. Link again to turn them back on."
+              : "Get one evening message when your Chog's items are waiting, with a Claim button."}
+          </p>
+          <Button variant="neutral" onClick={makeCode}>
             LINK TELEGRAM
           </Button>
         </>

@@ -1,4 +1,4 @@
-// Registers the Telegram webhook and bot commands.
+// Registers the Telegram webhook.
 //   TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=... APP_URL=https://... bun scripts/set-webhook.ts
 
 const token = process.env.TELEGRAM_BOT_TOKEN
@@ -25,12 +25,7 @@ await call("setWebhook", {
   allowed_updates: ["message", "callback_query"],
   drop_pending_updates: true,
 })
-await call("setMyCommands", {
-  commands: [
-    { command: "night", description: "Last night's diary and claim button" },
-    { command: "goals", description: "Your quests with check-in buttons" },
-    { command: "mute", description: "Turn nudges off or on" },
-  ],
-})
+// The bot has no slash commands besides /start, so clear any old command list.
+await call("deleteMyCommands", {})
 
 export {}

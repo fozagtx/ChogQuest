@@ -7,7 +7,9 @@ import { env } from "@/lib/env"
 import * as schema from "@/lib/db/schema"
 
 function create() {
-  return drizzle({ client: postgres(env.databaseUrl, { max: 10 }), schema })
+  // DATABASE_URL is Neon's pooled endpoint (PgBouncer, transaction mode), so
+  // prepared statements are off. Migrations use DATABASE_URL_UNPOOLED instead.
+  return drizzle({ client: postgres(env.databaseUrl, { max: 10, prepare: false }), schema })
 }
 
 export type Db = ReturnType<typeof create>
