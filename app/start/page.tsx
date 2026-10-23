@@ -2,7 +2,9 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useModal } from "connectkit"
+import { useEffect, useRef, useState } from "react"
+import { useAccount } from "wagmi"
 
 import { NftImage } from "@/components/game/nft-image"
 import { Button } from "@/components/ui/button"
@@ -56,12 +58,30 @@ export default function Start() {
     }
   }
 
-  const connect = () =>
+  // ConnectKit opens its wallet picker; once a wallet is connected we ask for the sign-in signature.
+  const { isConnected, address } = useAccount()
+  const { setOpen } = useModal()
+  const wantsSignIn = useRef(false)
+
+  const finishSignIn = () =>
     guard(async () => {
       await signIn()
       await loadChogs()
       setStep(2)
     })
+
+  const connect = () => {
+    if (isConnected) return finishSignIn()
+    wantsSignIn.current = true
+    setOpen(true)
+  }
+
+  useEffect(() => {
+    if (!wantsSignIn.current || !isConnected || !address) return
+    wantsSignIn.current = false
+    void finishSignIn()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when the wallet connects
+  }, [isConnected, address])
 
   const mintTest = () =>
     guard(async () => {

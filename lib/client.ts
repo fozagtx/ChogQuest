@@ -1,22 +1,19 @@
 "use client"
 
 import {
-  BaseError,
-  ContractFunctionRevertedError,
-  createPublicClient,
-  createWalletClient,
-  custom,
-  defineChain,
-  getAddress,
-  http,
-  parseAbi,
-  type Address,
-  type Hex,
-} from "viem"
+  getAccount,
+  signMessage,
+  simulateContract,
+  switchChain,
+  waitForTransactionReceipt,
+  writeContract,
+} from "wagmi/actions"
+import { BaseError, ContractFunctionRevertedError, parseAbi, type Address, type Hex } from "viem"
 
-import { MONAD, TEST_CHOG } from "@/lib/config"
+import { TEST_CHOG } from "@/lib/config"
+import { monad, wagmiConfig } from "@/lib/wagmi"
 
-// Browser helpers: API calls and the injected wallet (EIP-1193).
+// Browser helpers: API calls, plus wallet actions through ConnectKit/wagmi.
 
 export class ApiError extends Error {
   constructor(
@@ -39,44 +36,26 @@ export async function api<T>(path: string, init?: { method?: string; body?: unkn
   return data as T
 }
 
-type Eip1193 = { request(args: { method: string; params?: unknown[] }): Promise<unknown> }
+// ---------- wallet (ConnectKit + wagmi) ----------
 
-function provider(): Eip1193 {
-  const eth = (window as unknown as { ethereum?: Eip1193 }).ethereum
-  if (!eth) throw new Error("No wallet found. Install a browser wallet like MetaMask or Rabby.")
-  return eth
+function connectedAccount(): Address {
+  const { address } = getAccount(wagmiConfig)
+  if (!address) throw new Error("Connect your wallet first.")
+  return address
 }
 
-export async function connectWallet(): Promise<Address> {
-  const accounts = (await provider().request({ method: "eth_requestAccounts" })) as string[]
-  if (!accounts[0]) throw new Error("No account selected.")
-  return getAddress(accounts[0])
-}
-
-export async function signMessage(account: Address, message: string) {
-  const wallet = createWalletClient({ account, transport: custom(provider()) })
-  return wallet.signMessage({ account, message })
-}
-
-/** Connects the wallet and signs in. Returns the server's view of the user. */
 export async function signIn() {
-  const address = await connectWallet()
+  const address = connectedAccount()
   const { message } = await api<{ message: string }>("/api/auth/nonce", { body: { address } })
-  const signature = await signMessage(address, message)
+  const signature = await signMessage(wagmiConfig, { account: address, message })
   return api<{ address: Address; activeChog: number | null }>("/api/auth/verify", {
     body: { message, signature },
   })
 }
 
-// ---------- claiming on-chain from the player's wallet ----------
-
-const monadChain = defineChain({
-  id: MONAD.chainId,
-  name: MONAD.name,
-  nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
-  rpcUrls: { default: { http: [MONAD.rpcUrl] } },
-  blockExplorers: { default: { name: "Monadscan", url: MONAD.explorer } },
-})
+async function onMonad() {
+  if (getAccount(wagmiConfig).chainId !== monad.id) await switchChain(wagmiConfig, { chainId: monad.id })
+}
 
 const claimAbi = parseAbi([
   "function claimNight(uint256 tokenId, uint32 day) returns (uint16[] itemIds)",
@@ -86,96 +65,66 @@ const claimAbi = parseAbi([
   "error EnforcedPause()",
 ])
 
+const testChogAbi = parseAbi(["function mint() returns (uint256 tokenId)", "error MintLimitReached()"])
+
 const revertMessages: Record<string, string> = {
   NotChogHolder: "This wallet does not hold that Chog.",
   DayNotClaimable: "This night can no longer be claimed.",
   AlreadyClaimed: "Already claimed. Safe in your Chronicle.",
   EnforcedPause: "Claims are paused for a moment. Try again later.",
+  MintLimitReached: `Each wallet can mint up to ${TEST_CHOG.maxPerWallet} Test Chogs.`,
 }
 
-async function switchToMonad() {
-  const chainId = `0x${MONAD.chainId.toString(16)}`
-  try {
-    await provider().request({ method: "wallet_switchEthereumChain", params: [{ chainId }] })
-  } catch (err) {
-    // 4902: the wallet does not know the network yet.
-    if ((err as { code?: number }).code !== 4902) throw err
-    await provider().request({
-      method: "wallet_addEthereumChain",
-      params: [
-        {
-          chainId,
-          chainName: MONAD.name,
-          nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
-          rpcUrls: [MONAD.rpcUrl],
-          blockExplorerUrls: [MONAD.explorer],
-        },
-      ],
-    })
+function friendlyChainError(err: unknown): never {
+  if (err instanceof BaseError) {
+    const revert = err.walk((e) => e instanceof ContractFunctionRevertedError)
+    const name = revert instanceof ContractFunctionRevertedError ? revert.data?.errorName : undefined
+    if (name && revertMessages[name]) throw new Error(revertMessages[name])
+    if (/insufficient funds/i.test(err.message)) {
+      throw new Error("This wallet needs a little MON on Monad for gas (a few hundredths of a MON).")
+    }
   }
+  throw err
 }
 
 /** Sends Chronicle.claimNight from the connected wallet and waits for it to land. */
 export async function claimOnChain(chronicle: Address, tokenId: number, day: number): Promise<Hex> {
-  const account = await connectWallet()
-  await switchToMonad()
-  const wallet = createWalletClient({ account, chain: monadChain, transport: custom(provider()) })
-  const reader = createPublicClient({ chain: monadChain, transport: http() })
+  const account = connectedAccount()
   try {
-    const { request } = await reader.simulateContract({
+    await onMonad()
+    const { request } = await simulateContract(wagmiConfig, {
       account,
       address: chronicle,
       abi: claimAbi,
       functionName: "claimNight",
       args: [BigInt(tokenId), day],
     })
-    const hash = await wallet.writeContract(request)
-    const receipt = await reader.waitForTransactionReceipt({ hash })
+    const hash = await writeContract(wagmiConfig, request)
+    const receipt = await waitForTransactionReceipt(wagmiConfig, { hash })
     if (receipt.status !== "success") throw new Error("The claim transaction failed.")
     return hash
   } catch (err) {
-    if (err instanceof BaseError) {
-      const revert = err.walk((e) => e instanceof ContractFunctionRevertedError)
-      const name = revert instanceof ContractFunctionRevertedError ? revert.data?.errorName : undefined
-      if (name && revertMessages[name]) throw new Error(revertMessages[name])
-      if (/insufficient funds/i.test(err.message)) {
-        throw new Error("This wallet needs a little MON on Monad for gas. A claim costs about 0.02 MON.")
-      }
-    }
-    throw err
+    friendlyChainError(err)
   }
 }
 
-const testChogAbi = parseAbi(["function mint() returns (uint256 tokenId)", "error MintLimitReached()"])
-
 /** Mints one free Test Chog to the connected wallet (gas only) and waits for it to land. */
 export async function mintTestChog(): Promise<Hex> {
-  const account = await connectWallet()
-  await switchToMonad()
-  const wallet = createWalletClient({ account, chain: monadChain, transport: custom(provider()) })
-  const reader = createPublicClient({ chain: monadChain, transport: http() })
+  const account = connectedAccount()
   try {
-    const { request } = await reader.simulateContract({
+    await onMonad()
+    const { request } = await simulateContract(wagmiConfig, {
       account,
       address: TEST_CHOG.address,
       abi: testChogAbi,
       functionName: "mint",
     })
-    const hash = await wallet.writeContract(request)
-    const receipt = await reader.waitForTransactionReceipt({ hash })
+    const hash = await writeContract(wagmiConfig, request)
+    const receipt = await waitForTransactionReceipt(wagmiConfig, { hash })
     if (receipt.status !== "success") throw new Error("The mint transaction failed.")
     return hash
   } catch (err) {
-    if (err instanceof BaseError) {
-      const revert = err.walk((e) => e instanceof ContractFunctionRevertedError)
-      if (revert instanceof ContractFunctionRevertedError && revert.data?.errorName === "MintLimitReached") {
-        throw new Error(`Each wallet can mint up to ${TEST_CHOG.maxPerWallet} Test Chogs.`)
-      }
-      if (/insufficient funds/i.test(err.message)) {
-        throw new Error("This wallet needs a little MON on Monad for gas. Minting costs well under 0.05 MON.")
-      }
-    }
-    throw err
+    friendlyChainError(err)
   }
 }
 
