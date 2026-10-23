@@ -1,6 +1,21 @@
-# Quest Chog
+<p align="center">
+  <img src="docs/logo.png" alt="Quest Chog logo" width="96" height="96">
+</p>
 
-Your Chog has a goal. So do you. You complete yours, it completes its, you all win.
+<h1 align="center">Quest Chog</h1>
+
+<p align="center">
+  <strong>Your Chog has a goal. So do you.</strong><br>
+  You complete yours, it completes its, you all win.
+</p>
+
+<p align="center">
+  <a href="https://testnet.monadscan.com/address/0xb46cd62a826b94f07a507c5359f79f189200ec93">Chronicle on Monad testnet</a>
+  ·
+  <a href="https://chogathon.chog.xyz">Chogathon 2026</a>
+</p>
+
+![Quest Chog landing page](docs/banner.jpg)
 
 Your private goals become RPG quests. Your Chog NFT is your party member. Each night it goes out and comes back with a diary page and up to three items. XP, level, streak and items are recorded on Monad against the Chog's **token ID** in the Chronicle contract, so they follow the NFT if it changes wallets.
 
