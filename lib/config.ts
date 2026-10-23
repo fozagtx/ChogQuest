@@ -49,8 +49,8 @@ export function chogLabel(tokenId: number) {
 export const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/"
 
 export const TELEGRAM = {
-  /** The bot's @username without the @. Empty until the bot is created; the app hides Telegram links then. */
-  botUsername: "",
+  /** The bot's @username without the @ (https://t.me/chogquest_bot). */
+  botUsername: "chogquest_bot",
 } as const
 
 export const AI = {
