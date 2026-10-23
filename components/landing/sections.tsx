@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Moon, Sparkles, Target, Wallet } from "lucide-react"
 import { motion } from "motion/react"
 
+import { ChogLetter } from "@/components/brand/chog-letter"
 import { ChogHair } from "@/components/landing/chog-hair"
 import { Logo } from "@/components/landing/nav"
 import { buttonVariants } from "@/components/ui/button"
@@ -31,28 +32,49 @@ const steps = [
   {
     icon: Wallet,
     back: "bg-ink",
+    head: "#1A1200",
     title: "Claim your Chog",
     body: "Connect the wallet that holds it. Your Chog wakes up with a goal of its own.",
   },
   {
     icon: Target,
     back: "bg-violet",
+    head: "#8B6CFF",
     title: "Set your goals",
     body: "Pick up to three. They stay private. Your Chog gets its own quest to match.",
   },
   {
     icon: Sparkles,
     back: "bg-green",
+    head: "#34C77B",
     title: "Check in. Level up.",
     body: "Log what you did. Your Chog's quest moves too. You both level up.",
   },
   {
     icon: Moon,
     back: "bg-red",
+    head: "#FF6B5B",
     title: "Claim the night",
     body: "Every morning there is a diary page and up to three items. Claim them before the next day ends.",
   },
 ]
+
+/** A Chog head peeking in from the card's right edge, hair fanning up into the empty corner. */
+function PeekingHead({ color }: { color: string }) {
+  return (
+    <motion.div
+      aria-hidden="true"
+      className="pointer-events-none absolute top-2 -right-20 size-48"
+      variants={{
+        rest: { x: 14, rotate: -24, opacity: 0.3 },
+        hover: { x: -6, rotate: [-24, -34, -16, -26], opacity: 0.6 },
+      }}
+      transition={{ type: "spring", stiffness: 220, damping: 14, rotate: { duration: 0.6, ease: "easeInOut" } }}
+    >
+      <ChogLetter letter="O" color={color} className="size-full" />
+    </motion.div>
+  )
+}
 
 function StepIcon({ icon: Icon, back }: { icon: typeof Moon; back: string }) {
   return (
@@ -83,10 +105,11 @@ export function HowYouPlay() {
               initial="rest"
               whileHover="hover"
               animate="rest"
-              className="flex h-full min-h-[300px] flex-col gap-4 rounded-[40px] bg-accent-soft p-8 transition-colors duration-200 hover:bg-accent-softer"
+              className="relative flex h-full min-h-[300px] flex-col gap-4 overflow-hidden rounded-[40px] bg-accent-soft p-8 transition-colors duration-200 hover:bg-accent-softer"
             >
+              <PeekingHead color={s.head} />
               <StepIcon icon={s.icon} back={s.back} />
-              <div className="mt-auto flex flex-col gap-2">
+              <div className="relative mt-auto flex flex-col gap-2">
                 <span className="text-sm font-black text-ink/35">0{i + 1}</span>
                 <h3 className="text-xl font-extrabold">{s.title}</h3>
                 <p className="text-[17px] font-semibold text-ink/55">{s.body}</p>

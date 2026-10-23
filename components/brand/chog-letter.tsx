@@ -15,14 +15,18 @@ export function ChogLetter({
   letter,
   className,
   tone = "purple",
+  color,
 }: {
-  letter: "Q" | "C"
+  /** "O" is the bare head: ring and hair, no tail. */
+  letter: "Q" | "C" | "O"
   className?: string
   /** purple on light backgrounds, ink on the yellow app icon */
   tone?: "purple" | "ink"
+  /** solid colour override, e.g. to match a card */
+  color?: string
 }) {
   const id = useId()
-  const fill = tone === "ink" ? "#1A1200" : `url(#${id}-g)`
+  const fill = color ?? (tone === "ink" ? "#1A1200" : `url(#${id}-g)`)
 
   return (
     <svg viewBox="0 -14 104 110" className={cn("inline-block", className)} aria-hidden="true">
@@ -33,10 +37,10 @@ export function ChogLetter({
         </linearGradient>
       </defs>
       <path d={HAIR} fill={fill} />
-      {letter === "Q" ? (
+      {letter !== "C" ? (
         <>
           <circle cx="50" cy="58" r="25.5" fill="none" stroke={fill} strokeWidth="17" />
-          <path d={Q_TAIL} fill={fill} />
+          {letter === "Q" && <path d={Q_TAIL} fill={fill} />}
         </>
       ) : (
         <path d={C_ARC} fill="none" stroke={fill} strokeWidth="17" strokeLinecap="round" />
