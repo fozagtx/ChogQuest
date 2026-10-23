@@ -9,7 +9,7 @@ import { rarityFill } from "@/components/game/rarity"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { api, errorMessage } from "@/lib/client"
-import { explorerAddress } from "@/lib/contracts"
+import { explorerAddress } from "@/lib/config"
 import { LEVEL_XP } from "@/lib/xp"
 import { cn } from "@/lib/utils"
 

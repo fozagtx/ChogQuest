@@ -14,10 +14,6 @@ envVarGroups:
         sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
-      - key: TELEGRAM_BOT_USERNAME
-        sync: false
-      - key: NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
-        sync: false
       - key: AI_API_KEY
         sync: false
       # Neon pooled connection string (the direct one for migrations is derived from it).

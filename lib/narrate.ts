@@ -1,5 +1,6 @@
 import "server-only"
 
+import { AI } from "@/lib/config"
 import { env } from "@/lib/env"
 import type { NightRoll } from "@/lib/night"
 
@@ -44,7 +45,7 @@ async function viaGateway(baseUrl: string, token: string, prompt: string) {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      model: env.aiModel(),
+      model: AI.model,
       max_tokens: 300,
       messages: [{ role: "user", content: prompt }],
     }),
@@ -65,7 +66,7 @@ async function viaAnthropic(key: string, prompt: string) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: env.aiModel(),
+      model: AI.model,
       max_tokens: 300,
       messages: [{ role: "user", content: prompt }],
     }),

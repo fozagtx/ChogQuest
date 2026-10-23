@@ -1,6 +1,6 @@
 import "server-only"
 
-import { CHOG_NFT, CHRONICLE, MONAD_TESTNET } from "@/lib/contracts"
+import { CHOG_NFT, CHRONICLE, MONAD_TESTNET } from "@/lib/config"
 
 // Server-side configuration. Required values throw on first use so a missing
 // secret fails loudly instead of silently degrading.
@@ -28,7 +28,7 @@ export const env = {
   get cronSecret() {
     return required("CRON_SECRET")
   },
-  // Chain config lives in lib/contracts.ts. The DEV_* names exist only to point a
+  // Chain config lives in lib/config.ts. The DEV_* names exist only to point a
   // local run at anvil; ordinary env vars like CHRONICLE_ADDRESS are ignored on purpose.
   get monadRpcUrl() {
     return optional("DEV_MONAD_RPC_URL") ?? MONAD_TESTNET.rpcUrl
@@ -44,11 +44,9 @@ export const env = {
   aiGatewayUrl: () => optional("NEON_AI_GATEWAY_BASE_URL"),
   aiGatewayToken: () => optional("NEON_AI_GATEWAY_TOKEN"),
   aiApiKey: () => optional("AI_API_KEY"),
-  aiModel: () => optional("AI_MODEL") ?? "claude-haiku-5-5",
   telegramBotToken: () => optional("TELEGRAM_BOT_TOKEN"),
   // Telegram only accepts A-Z, a-z, 0-9, _ and - in the secret; scripts/set-webhook.ts strips the same way.
   telegramWebhookSecret: () => optional("TELEGRAM_WEBHOOK_SECRET")?.replace(/[^A-Za-z0-9_-]/g, ""),
-  telegramBotUsername: () => optional("TELEGRAM_BOT_USERNAME"),
   // Render sets RENDER_EXTERNAL_URL on web services, so APP_URL is only needed elsewhere.
   appUrl: () => optional("APP_URL") ?? optional("RENDER_EXTERNAL_URL") ?? "http://localhost:3000",
 }

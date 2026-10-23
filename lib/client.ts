@@ -14,7 +14,7 @@ import {
   type Hex,
 } from "viem"
 
-import { MONAD_TESTNET } from "@/lib/contracts"
+import { MONAD_TESTNET } from "@/lib/config"
 
 // Browser helpers: API calls and the injected wallet (EIP-1193).
 

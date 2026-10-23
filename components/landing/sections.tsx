@@ -8,7 +8,7 @@ import { ChogLetter } from "@/components/brand/chog-letter"
 import { ChogHair } from "@/components/landing/chog-hair"
 import { Logo } from "@/components/landing/nav"
 import { buttonVariants } from "@/components/ui/button"
-import { CHRONICLE, explorerAddress, explorerTx } from "@/lib/contracts"
+import { CHRONICLE, explorerAddress, explorerTx } from "@/lib/config"
 import { ITEMS, type Rarity } from "@/lib/items"
 import { cn } from "@/lib/utils"
 

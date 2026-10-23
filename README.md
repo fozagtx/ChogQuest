@@ -41,7 +41,8 @@ Built for Chogathon 2026.
 | `neon.ts`, `functions/scheduler.ts` | Neon backend: Postgres, AI Gateway, and the scheduler Function with its cron triggers |
 | `contracts/` | Foundry project with `Chronicle.sol`, 21 tests, deploy script |
 | `scripts/smoke.ts` | End-to-end check of the API with a real wallet key |
-| `render.yaml` | Render Blueprint for the web service and its env group |
+| `lib/config.ts` | Public settings: Monad testnet RPC and explorer, Chog NFT and Chronicle addresses, Telegram bot username, AI model |
+| `render.yaml` | Render Blueprint for the web service and its env group (secrets only) |
 
 ## Trust model
 
@@ -77,7 +78,7 @@ cd contracts && forge create src/Chronicle.sol:Chronicle --rpc-url http://127.0.
   --private-key <deployer key> --broadcast --constructor-args <owner> <an ERC-721 you hold>
 ```
 
-Contract addresses live in `lib/contracts.ts`. For a local chain only, point the app at it with `DEV_MONAD_RPC_URL=http://127.0.0.1:8545`, `DEV_CHRONICLE_ADDRESS` and `DEV_CHOG_NFT_ADDRESS`, then:
+Contract addresses live in `lib/config.ts`. For a local chain only, point the app at it with `DEV_MONAD_RPC_URL=http://127.0.0.1:8545`, `DEV_CHRONICLE_ADDRESS` and `DEV_CHOG_NFT_ADDRESS`, then:
 
 ```bash
 BASE_URL=http://localhost:3000 SMOKE_PRIVATE_KEY=<holder key> SMOKE_TOKEN_ID=<id> bun run smoke
@@ -97,7 +98,7 @@ Deployed on Monad testnet (chain 10143). It reads the Chog Genesis (Testnet) NFT
 | Deploy transaction | [`0xf163983a…fb739b`](https://testnet.monadscan.com/tx/0xf163983af9ce35133e2e610db587c9d2b303591602cbb93c41df399835fb739b) (block 73,415,961) |
 | Owner (can pause) | [`0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826`](https://testnet.monadscan.com/address/0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826) |
 
-The app always uses these addresses (`lib/contracts.ts`); no env var is needed. An earlier signer-based Chronicle at `0xb46c…ec93` is paused and unused.
+The app always uses these addresses from `lib/config.ts`; no env var is needed. An earlier signer-based Chronicle at `0xb46c…ec93` is paused and unused.
 
 ```bash
 cd contracts
@@ -120,7 +121,7 @@ The app uses the pooled `DATABASE_URL` with `postgres.js` (prepared statements o
 ### 3. Render (web app)
 
 1. Push the repo and create a Blueprint from `render.yaml`. It runs one web service in Ohio, next to the Neon project in `aws-us-east-2`.
-2. Fill in the two required values: the Neon `DATABASE_URL`, and `CRON_SECRET` (the same value the Neon scheduler was deployed with). Telegram and AI values are optional.
+2. Fill in the two required values: the Neon `DATABASE_URL`, and `CRON_SECRET` (the same value the Neon scheduler was deployed with). Telegram and AI values are optional. Public settings, including the bot username, go in `lib/config.ts`, not env.
 3. Set `APP_URL` in `.env.local` to the Render URL and run `neon deploy --env .env.local` again so the scheduler calls it.
 4. Register the bot webhook once, if you use Telegram:
 

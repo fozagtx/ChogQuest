@@ -1,4 +1,5 @@
-// Deployed contract addresses. The app always uses these (see lib/env.ts for local-only DEV_* overrides).
+// Public app config. Nothing here is secret, so it lives in code, not in env vars.
+// Secrets (database URL, session and encryption keys, bot token) stay in env.
 
 export const MONAD_TESTNET = {
   chainId: 10143,
@@ -19,6 +20,21 @@ export const CHRONICLE = {
   deployTx: "0xf163983af9ce35133e2e610db587c9d2b303591602cbb93c41df399835fb739b",
   deployBlock: 73_415_961,
 } as const
+
+export const TELEGRAM = {
+  /** The bot's @username without the @. Empty until the bot is created; the app hides Telegram links then. */
+  botUsername: "",
+} as const
+
+export const AI = {
+  /** Model used for diary narration through the Neon AI Gateway (or Anthropic, with AI_API_KEY). */
+  model: "claude-haiku-5-5",
+} as const
+
+export function telegramBotUrl(startCode?: string) {
+  if (!TELEGRAM.botUsername) return null
+  return `https://t.me/${TELEGRAM.botUsername}${startCode ? `?start=${startCode}` : ""}`
+}
 
 export function explorerAddress(address: string) {
   return `${MONAD_TESTNET.explorer}/address/${address}`

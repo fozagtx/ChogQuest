@@ -13,6 +13,7 @@ import {
 
 import { ChogShader } from "@/components/landing/chog-shader"
 import { Wordmark } from "@/components/brand/chog-letter"
+import { telegramBotUrl } from "@/lib/config"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -180,7 +181,7 @@ function Phone({ mx, my, reduce }: { mx: MotionValue<number>; my: MotionValue<nu
   )
 }
 
-const bot = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
+const botUrl = telegramBotUrl()
 
 const words = ["Your", "Chog", "has", "a", "goal.", "So", "do", "you."]
 
@@ -252,10 +253,10 @@ export function Hero() {
             <Link href="/start" className={cn(buttonVariants({ size: "lg" }), "min-h-14 px-8 text-lg")}>
               Connect wallet
             </Link>
-            {/* Shown once the bot is deployed and NEXT_PUBLIC_TELEGRAM_BOT_USERNAME is set. */}
-            {bot && (
+            {/* Shown once TELEGRAM.botUsername is set in lib/config.ts. */}
+            {botUrl && (
               <a
-                href={`https://t.me/${bot}`}
+                href={botUrl}
                 target="_blank"
                 rel="noreferrer"
                 className={cn(buttonVariants({ variant: "neutral", size: "lg" }), "min-h-14 px-8 text-lg")}
