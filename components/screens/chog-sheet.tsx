@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Flame,
   Gem,
+  Loader2,
   Moon,
   PackageOpen,
   Send,
@@ -16,7 +17,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { ChogLetter } from "@/components/brand/chog-letter"
 import { useAppState } from "@/components/game/app-state"
@@ -280,6 +281,19 @@ function TelegramLink({ linked, muted }: { linked: boolean; muted: boolean }) {
   }
 
   const on = linked && !muted
+  const { refresh } = useAppState()
+  const waiting = !!code && !on
+
+  // While a code is out, check every few seconds so the panel flips to Linked by itself.
+  useEffect(() => {
+    if (!waiting) return
+    const t = setInterval(refresh, 3000)
+    const stop = setTimeout(() => clearInterval(t), 15 * 60_000)
+    return () => {
+      clearInterval(t)
+      clearTimeout(stop)
+    }
+  }, [waiting, refresh])
 
   return (
     <section className="flex h-full flex-col gap-3 rounded-[32px] bg-white p-5 shadow-shadow">
@@ -310,6 +324,10 @@ function TelegramLink({ linked, muted }: { linked: boolean; muted: boolean }) {
             >
               Open Telegram <ExternalLink strokeWidth={3} />
             </a>
+            <p role="status" className="flex items-center gap-2 text-[14px] font-bold text-ink/70">
+              <Loader2 className="size-4 animate-spin" strokeWidth={3} aria-hidden="true" />
+              Waiting for you to press Start in Telegram
+            </p>
           </>
         ) : (
           <p className="text-[15px] font-bold text-ink/75">
