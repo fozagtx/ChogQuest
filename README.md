@@ -10,6 +10,8 @@
 </p>
 
 <p align="center">
+  <a href="https://questchog.onrender.com"><strong>Play: questchog.onrender.com</strong></a>
+  ·
   <a href="https://monadscan.com/address/0xB46cd62a826b94f07a507c5359F79F189200ec93">Chronicle on Monad</a>
   ·
   <a href="https://chogathon.chog.xyz">Chogathon 2026</a>
@@ -133,7 +135,7 @@ Notes from Render's docs (October 2026): a Free web service spins down after 15 
 
 ## Testing instructions for judges
 
-1. Open the app URL and press **CLAIM YOUR CHOG**.
+1. Open https://questchog.onrender.com and press **Connect wallet**.
 2. Connect a wallet that holds a Chog Genesis NFT on Monad mainnet and a little MON for gas, then sign the free sign-in message.
 3. Pick your Chog and set a first goal.
 4. On **Today**, read last night's diary, press **CLAIM** and confirm in your wallet. XP goes up and the transaction links to the explorer.
