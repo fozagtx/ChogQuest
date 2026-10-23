@@ -22,6 +22,29 @@ export const CHRONICLE = {
   deployBlock: 115_792_506,
 } as const
 
+/**
+ * Free Test Chogs, so people without a Chog Genesis can try the game. Anyone can mint a few
+ * for gas only. IDs start at 1,000,001, above every Chog Genesis ID, and they have their own
+ * Chronicle, so test progress never mixes with real Chogs.
+ */
+export const TEST_CHOG = {
+  name: "Test Chog",
+  address: "0x6b52bBa2e20E1B3842dd2b297d5398d718e548b6",
+  chronicle: "0x5DEBb59e4A20430c529567812836d5d7a7F7ca3D",
+  firstId: 1_000_001,
+  maxPerWallet: 3,
+  chainId: MONAD.chainId,
+} as const
+
+export function isTestChog(tokenId: number) {
+  return tokenId >= TEST_CHOG.firstId
+}
+
+/** "CHOG #642" for a real Chog, "TEST CHOG #1" for a test one. */
+export function chogLabel(tokenId: number) {
+  return isTestChog(tokenId) ? `TEST CHOG #${tokenId - TEST_CHOG.firstId + 1}` : `CHOG #${tokenId}`
+}
+
 /** IPFS gateway for Chog metadata and art. ipfs.io and dweb.link stopped serving direct requests. */
 export const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/"
 

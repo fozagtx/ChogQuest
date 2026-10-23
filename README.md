@@ -41,7 +41,7 @@ Built for Chogathon 2026.
 | `lib/bot.ts`, `app/api/telegram` | Telegram bot: link with `/start CODE`, then Claim and Mute buttons on the evening nudge |
 | `lib/cron.ts` | Evening job: one Telegram nudge per linked player when tonight's items are unclaimed |
 | `neon.ts`, `functions/scheduler.ts` | Neon backend: Postgres and the scheduler Function with its evening trigger |
-| `contracts/` | Foundry project with `Chronicle.sol`, 21 tests, deploy script |
+| `contracts/` | Foundry project with `Chronicle.sol` and `TestChog.sol`, 21 tests, deploy scripts |
 | `scripts/smoke.ts` | End-to-end check of the API with a real wallet key |
 | `lib/config.ts` | Public settings: Monad mainnet RPC and explorer, Chog NFT and Chronicle addresses, Telegram bot username, Nebius endpoint and model |
 | `render.yaml` | Render Blueprint for the web service and its env group (secrets only) |
@@ -100,6 +100,13 @@ Deployed on **Monad mainnet** (chain 143). It reads the real [Chog Genesis](http
 | Deploy transaction | [`0x6474bd30…feef4b`](https://monadscan.com/tx/0x6474bd30c171e7200e670f4fec7972eaac4276e6fa1afa30d4cf32dda2feef4b) (block 115,792,506) |
 | Owner (can pause) | [`0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826`](https://monadscan.com/address/0xE712a13CFA3220B9b1Ea5f7bd6e77CAd44F5B826) |
 
+**No Chog? Test Chogs.** Anyone can mint up to 3 free Test Chogs (gas only) from the "Pick your Chog" screen. They use the official Chog art, are labelled TEST, start at token ID 1,000,001 so they never overlap real Chogs, and have their own Chronicle so test progress never mixes with real progress.
+
+| | |
+| --- | --- |
+| Test Chog NFT | [`0x6b52bBa2e20E1B3842dd2b297d5398d718e548b6`](https://monadscan.com/address/0x6b52bBa2e20E1B3842dd2b297d5398d718e548b6) |
+| Test Chronicle | [`0x5DEBb59e4A20430c529567812836d5d7a7F7ca3D`](https://monadscan.com/address/0x5DEBb59e4A20430c529567812836d5d7a7F7ca3D) |
+
 The app always uses these addresses from `lib/config.ts`; no env var is needed. Earlier testnet deployments on chain 10143 are unused. The mainnet Chronicle shares its address with the paused signer-based testnet one only because both were the deployer's first transaction on their chain.
 
 ```bash
@@ -136,7 +143,7 @@ Notes from Render's docs (October 2026): a Free web service spins down after 15 
 ## Testing instructions for judges
 
 1. Open https://questchog.onrender.com and press **Connect wallet**.
-2. Connect a wallet that holds a Chog Genesis NFT on Monad mainnet and a little MON for gas, then sign the free sign-in message.
+2. Connect a wallet with a little MON on Monad mainnet and sign the free sign-in message. If it holds a Chog Genesis, pick it; if not, press **MINT A FREE TEST CHOG**.
 3. Pick your Chog and set a first goal.
 4. On **Today**, read last night's diary, press **CLAIM** and confirm in your wallet. XP goes up and the transaction links to the explorer.
 5. Check in on your goal. Your Chog's quest moves too.

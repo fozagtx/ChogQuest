@@ -4,7 +4,8 @@ import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm"
 import { getAddress } from "viem"
 
 import { HttpError } from "@/lib/api"
-import { chogMetadata, isChogOwner, verifyClaimTx } from "@/lib/chain"
+import { chogMetadata, chronicleFor, isChogOwner, verifyClaimTx } from "@/lib/chain"
+import { chogLabel, isTestChog } from "@/lib/config"
 import { decrypt, encrypt } from "@/lib/crypto"
 import { addDays, dayFromNumber, startOfDay, today } from "@/lib/days"
 import { getDb, schema, type Tx } from "@/lib/db"
@@ -520,8 +521,11 @@ export async function getState(user: User): Promise<AppState> {
 
   return {
     ...base,
+    chronicle: { address: chronicleFor(tokenId) },
     chog: {
       tokenId,
+      label: chogLabel(tokenId),
+      isTest: isTestChog(tokenId),
       name: meta.name,
       image: meta.image,
       xp: xpRow.xp,

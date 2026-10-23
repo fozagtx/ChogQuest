@@ -30,6 +30,9 @@ export type AppState = {
   user: { address: string; telegramLinked: boolean; telegramMuted: boolean }
   chog: null | {
     tokenId: number
+    /** "CHOG #642" or "TEST CHOG #1" */
+    label: string
+    isTest: boolean
     name: string
     image: string | null
     xp: number

@@ -8,7 +8,8 @@ import { NftImage } from "@/components/game/nft-image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ApiError, api, errorMessage, signIn } from "@/lib/client"
+import { ApiError, api, errorMessage, mintTestChog, signIn } from "@/lib/client"
+import { TEST_CHOG, chogLabel, isTestChog } from "@/lib/config"
 import { cn } from "@/lib/utils"
 
 type ChogMeta = { tokenId: number; name: string; image: string | null }
@@ -41,21 +42,32 @@ export default function Start() {
     }
   }
 
+  async function loadChogs() {
+    try {
+      const res = await api<{ chogs: ChogMeta[]; activeChog: number | null }>("/api/chogs")
+      setChogs(res.chogs)
+      setPicked(res.activeChog ?? res.chogs[0]?.tokenId ?? null)
+    } catch (err) {
+      // The NFT contract may not support listing by owner. Fall back to typing the ID.
+      if (err instanceof ApiError && err.status === 501) {
+        setChogs([])
+        setManual(true)
+      } else throw err
+    }
+  }
+
   const connect = () =>
     guard(async () => {
       await signIn()
-      try {
-        const res = await api<{ chogs: ChogMeta[]; activeChog: number | null }>("/api/chogs")
-        setChogs(res.chogs)
-        setPicked(res.activeChog ?? res.chogs[0]?.tokenId ?? null)
-      } catch (err) {
-        // The NFT contract may not support listing by owner. Fall back to typing the ID.
-        if (err instanceof ApiError && err.status === 501) {
-          setChogs([])
-          setManual(true)
-        } else throw err
-      }
+      await loadChogs()
       setStep(2)
+    })
+
+  const mintTest = () =>
+    guard(async () => {
+      await mintTestChog()
+      setManual(false)
+      await loadChogs()
     })
 
   const choose = () =>
@@ -141,10 +153,22 @@ export default function Start() {
               </div>
             </>
           ) : chogs && chogs.length === 0 ? (
-            <p>
-              No Chogs found in this wallet. Quest Chog needs a Chog NFT: its items, XP and streak are recorded
-              against it.
-            </p>
+            <div className="flex flex-col gap-4">
+              <p>
+                No Chogs in this wallet yet. Quest Chog needs a Chog: its items, XP and streak are recorded against
+                it.
+              </p>
+              <div className="flex flex-col gap-3 rounded-base bg-accent-soft p-4">
+                <div className="font-pixel text-sm font-bold">NO CHOG? MINT A FREE TEST CHOG</div>
+                <p className="text-[15px]">
+                  Test Chogs are free (gas only, well under a cent) and work exactly like a real Chog. They are
+                  labelled TEST and are not Chog Genesis NFTs. Up to {TEST_CHOG.maxPerWallet} per wallet.
+                </p>
+                <Button size="lg" className={bigButton} onClick={mintTest} disabled={busy}>
+                  {busy ? "CONFIRM IN WALLET..." : "MINT A FREE TEST CHOG"}
+                </Button>
+              </div>
+            </div>
           ) : (
             <>
               <p>
@@ -166,7 +190,12 @@ export default function Start() {
                   >
                     <NftImage src={c.image} alt={c.name} className="size-18 flex-none text-[10px]" />
                     <div>
-                      <div className="font-pixel text-base font-bold">CHOG #{c.tokenId}</div>
+                      <div className="flex items-center gap-2 font-pixel text-base font-bold">
+                        {chogLabel(c.tokenId)}
+                        {isTestChog(c.tokenId) && (
+                          <span className="rounded-full bg-violet px-2 py-0.5 text-[10px] text-white">TEST</span>
+                        )}
+                      </div>
                       <div className="text-sm">{c.name}</div>
                     </div>
                   </button>

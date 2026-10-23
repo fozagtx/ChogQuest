@@ -2,8 +2,17 @@ import "server-only"
 
 import { createPublicClient, decodeEventLog, getAddress, http, parseAbi, type Address, type Hex } from "viem"
 
-import { IPFS_GATEWAY } from "@/lib/config"
+import { IPFS_GATEWAY, TEST_CHOG, chogLabel, isTestChog } from "@/lib/config"
 import { env } from "@/lib/env"
+
+/** Which NFT contract and Chronicle a token belongs to: Chog Genesis, or the free Test Chogs. */
+function nftFor(tokenId: number): Address {
+  return isTestChog(tokenId) ? TEST_CHOG.address : env.chogNftAddress
+}
+function chronicleFor(tokenId: number): Address {
+  return isTestChog(tokenId) ? TEST_CHOG.chronicle : env.chronicleAddress()
+}
+export { chronicleFor }
 
 const erc721Abi = parseAbi([
   "function ownerOf(uint256 tokenId) view returns (address)",
@@ -34,7 +43,7 @@ function monadClient() {
 export async function ownerOfChog(tokenId: number): Promise<Address | null> {
   try {
     const owner = await chogClient().readContract({
-      address: env.chogNftAddress,
+      address: nftFor(tokenId),
       abi: erc721Abi,
       functionName: "ownerOf",
       args: [BigInt(tokenId)],
@@ -51,88 +60,89 @@ export async function isChogOwner(address: string, tokenId: number) {
 }
 
 const MAX_LISTED = 50
-
-/**
- * Lists Chogs held by a wallet. Uses ERC721Enumerable when available, otherwise
- * checks ownerOf for every minted token. Returns null if neither works.
- */
-export async function chogsOfOwner(address: string): Promise<number[] | null> {
-  const client = chogClient()
-  const owner = getAddress(address)
-  const balance = await client.readContract({
-    address: env.chogNftAddress,
-    abi: erc721Abi,
-    functionName: "balanceOf",
-    args: [owner],
-  })
-  const count = Math.min(Number(balance), MAX_LISTED)
-  if (count === 0) return []
-  try {
-    const ids = await client.multicall({
-      multicallAddress: MULTICALL3,
-      allowFailure: false,
-      contracts: Array.from({ length: count }, (_, i) => ({
-        address: env.chogNftAddress,
-        abi: erc721Abi,
-        functionName: "tokenOfOwnerByIndex" as const,
-        args: [owner, BigInt(i)] as const,
-      })),
-    })
-    return ids.map(Number).sort((a, b) => a - b)
-  } catch {
-    // Some chains lack multicall3, or the contract is not enumerable. Try sequentially.
-    try {
-      const ids: number[] = []
-      for (let i = 0; i < count; i++) {
-        const id = await client.readContract({
-          address: env.chogNftAddress,
-          abi: erc721Abi,
-          functionName: "tokenOfOwnerByIndex",
-          args: [owner, BigInt(i)],
-        })
-        ids.push(Number(id))
-      }
-      return ids.sort((a, b) => a - b)
-    } catch {
-      return scanOwners(owner)
-    }
-  }
-}
-
 const MAX_SCAN = 5000
 const SCAN_BATCH = 400
 // Canonical Multicall3, deployed on Monad. Passed explicitly because the clients have no chain config.
 const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11"
 
-/** For collections without ERC721Enumerable (Chog Genesis): check ownerOf for ids 0..totalSupply. */
-async function scanOwners(owner: Address): Promise<number[] | null> {
+/**
+ * Lists a wallet's Chogs: real Chog Genesis first, then free Test Chogs.
+ * Returns null only if the real collection could not be read at all.
+ */
+export async function chogsOfOwner(address: string): Promise<number[] | null> {
+  const owner = getAddress(address)
+  const [real, test] = await Promise.all([realChogsOf(owner), testChogsOf(owner).catch(() => [])])
+  if (real === null && test.length === 0) return null
+  return [...(real ?? []), ...test].slice(0, MAX_LISTED)
+}
+
+async function realChogsOf(owner: Address): Promise<number[] | null> {
   const client = chogClient()
+  const nft = env.chogNftAddress
+  const balance = await client.readContract({ address: nft, abi: erc721Abi, functionName: "balanceOf", args: [owner] })
+  if (Number(balance) === 0) return []
   try {
-    const supply = await client.readContract({ address: env.chogNftAddress, abi: erc721Abi, functionName: "totalSupply" })
-    const ids = Array.from({ length: Math.min(Number(supply), MAX_SCAN) + 1 }, (_, i) => i)
-    const held: number[] = []
-    // Batches keep each eth_call small enough for public RPC limits.
-    for (let i = 0; i < ids.length; i += SCAN_BATCH) {
-      const batch = ids.slice(i, i + SCAN_BATCH)
-      const owners = await client.multicall({
-        multicallAddress: MULTICALL3,
-        allowFailure: true,
-        contracts: batch.map((id) => ({
-          address: env.chogNftAddress,
-          abi: erc721Abi,
-          functionName: "ownerOf" as const,
-          args: [BigInt(id)] as const,
-        })),
-      })
-      batch.forEach((id, j) => {
-        if (owners[j].status === "success" && getAddress(owners[j].result as Address) === owner) held.push(id)
-      })
-      if (held.length >= MAX_LISTED) break
-    }
-    return held.slice(0, MAX_LISTED)
+    // ERC721Enumerable, when the collection supports it.
+    const ids = await client.multicall({
+      multicallAddress: MULTICALL3,
+      allowFailure: false,
+      contracts: Array.from({ length: Math.min(Number(balance), MAX_LISTED) }, (_, i) => ({
+        address: nft,
+        abi: erc721Abi,
+        functionName: "tokenOfOwnerByIndex" as const,
+        args: [owner, BigInt(i)] as const,
+      })),
+    })
+    return ids.map(Number).sort((x, y) => x - y)
   } catch {
-    return null
+    // Chog Genesis is not enumerable: check ownerOf for every minted id.
+    try {
+      const supply = await client.readContract({ address: nft, abi: erc721Abi, functionName: "totalSupply" })
+      const ids = Array.from({ length: Math.min(Number(supply), MAX_SCAN) + 1 }, (_, i) => i)
+      return await scanOwners(nft, owner, ids)
+    } catch {
+      return null
+    }
   }
+}
+
+async function testChogsOf(owner: Address): Promise<number[]> {
+  const client = chogClient()
+  const balance = await client.readContract({
+    address: TEST_CHOG.address,
+    abi: erc721Abi,
+    functionName: "balanceOf",
+    args: [owner],
+  })
+  if (Number(balance) === 0) return []
+  const supply = await client.readContract({ address: TEST_CHOG.address, abi: erc721Abi, functionName: "totalSupply" })
+  const ids = Array.from({ length: Math.min(Number(supply), MAX_SCAN) }, (_, i) => TEST_CHOG.firstId + i)
+  return scanOwners(TEST_CHOG.address, owner, ids)
+}
+
+/** ownerOf for each id in batches, keeping the ones `owner` holds. */
+async function scanOwners(nft: Address, owner: Address, ids: number[]): Promise<number[]> {
+  const client = chogClient()
+  const held: number[] = []
+  // Batches keep each eth_call small enough for public RPC limits.
+  for (let i = 0; i < ids.length; i += SCAN_BATCH) {
+    const batch = ids.slice(i, i + SCAN_BATCH)
+    const owners = await client.multicall({
+      multicallAddress: MULTICALL3,
+      allowFailure: true,
+      contracts: batch.map((id) => ({
+        address: nft,
+        abi: erc721Abi,
+        functionName: "ownerOf" as const,
+        args: [BigInt(id)] as const,
+      })),
+    })
+    batch.forEach((id, j) => {
+      if (owners[j].status === "success" && getAddress(owners[j].result as Address) === owner) held.push(id)
+    })
+    if (held.length >= MAX_LISTED) break
+  }
+  return held.slice(0, MAX_LISTED)
 }
 
 export type ChogMeta = { tokenId: number; name: string; image: string | null }
@@ -151,10 +161,10 @@ export async function chogMetadata(tokenId: number): Promise<ChogMeta> {
   const hit = metaCache.get(tokenId)
   if (hit && Date.now() - hit.at < META_TTL) return hit.meta
 
-  let meta: ChogMeta = { tokenId, name: `Chog #${tokenId}`, image: null }
+  let meta: ChogMeta = { tokenId, name: chogLabel(tokenId), image: null }
   try {
     const uri = await chogClient().readContract({
-      address: env.chogNftAddress,
+      address: nftFor(tokenId),
       abi: erc721Abi,
       functionName: "tokenURI",
       args: [BigInt(tokenId)],
@@ -185,7 +195,7 @@ export async function chogMetadata(tokenId: number): Promise<ChogMeta> {
 /** The night's items, rolled by the contract itself from (tokenId, day). */
 export async function rollNightOnChain(tokenId: number, dayNumber: number): Promise<number[]> {
   const ids = await monadClient().readContract({
-    address: env.chronicleAddress(),
+    address: chronicleFor(tokenId),
     abi: chronicleAbi,
     functionName: "rollNight",
     args: [BigInt(tokenId), dayNumber],
@@ -202,11 +212,13 @@ export type VerifiedClaim = { tokenId: number; day: number; holder: Address; ite
 export async function verifyClaimTx(txHash: Hex): Promise<VerifiedClaim | null> {
   const receipt = await monadClient().waitForTransactionReceipt({ hash: txHash, timeout: 60_000 })
   if (receipt.status !== "success") return null
-  const chronicle = getAddress(env.chronicleAddress())
+  const chronicles = new Set([getAddress(env.chronicleAddress()), getAddress(TEST_CHOG.chronicle)])
   for (const log of receipt.logs) {
-    if (getAddress(log.address) !== chronicle) continue
+    if (!chronicles.has(getAddress(log.address))) continue
     try {
       const ev = decodeEventLog({ abi: chronicleAbi, eventName: "NightClaimed", data: log.data, topics: log.topics })
+      // A token only counts on its own collection's Chronicle.
+      if (getAddress(chronicleFor(Number(ev.args.tokenId))) !== getAddress(log.address)) continue
       return {
         tokenId: Number(ev.args.tokenId),
         day: ev.args.day,
@@ -223,7 +235,7 @@ export async function verifyClaimTx(txHash: Hex): Promise<VerifiedClaim | null> 
 
 export async function chronicleOf(tokenId: number) {
   const [xp, level, streak, lastClaimDay, claimed] = await monadClient().readContract({
-    address: env.chronicleAddress(),
+    address: chronicleFor(tokenId),
     abi: chronicleAbi,
     functionName: "chronicleOf",
     args: [BigInt(tokenId)],

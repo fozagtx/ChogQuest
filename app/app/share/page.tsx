@@ -110,10 +110,10 @@ function shareText(card: CardKind, s: Ready, hide: boolean) {
   switch (card) {
     case "QUEST":
       return s.lastCompleted
-        ? `Quest complete: ${hide ? "a big goal" : s.lastCompleted.name}. +${s.lastCompleted.xpReward} XP with Chog #${c.tokenId}. #QuestChog`
-        : `Questing with Chog #${c.tokenId}. #QuestChog`
+        ? `Quest complete: ${hide ? "a big goal" : s.lastCompleted.name}. +${s.lastCompleted.xpReward} XP with ${c.label}. #QuestChog`
+        : `Questing with ${c.label}. #QuestChog`
     case "XP":
-      return `${s.weeklyXp.reduce((a, d) => a + d.xp, 0)} XP this week with Chog #${c.tokenId}. #QuestChog`
+      return `${s.weeklyXp.reduce((a, d) => a + d.xp, 0)} XP this week with ${c.label}. #QuestChog`
     case "DIARY":
       return s.night ? `Night ${s.night.number}: ${s.night.title}. ${s.night.diary} #QuestChog` : `#QuestChog`
     default:
@@ -199,7 +199,7 @@ function CardBody({ card, state, hideNames }: { card: CardKind; state: Ready; hi
         <div className="font-pixel text-lg font-bold">{state.night.title}</div>
         <p className="text-[15px]">{state.night.diary}</p>
         <div className="font-pixel text-[11px] font-bold">
-          CHOG #{chog.tokenId}{" // "}{state.night.items.length} ITEMS FOUND
+          {chog.label}{" // "}{state.night.items.length} ITEMS FOUND
         </div>
       </div>
     </ShareCard>

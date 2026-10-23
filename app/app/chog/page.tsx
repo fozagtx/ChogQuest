@@ -31,7 +31,10 @@ export default function ChogSheet() {
             <section className="flex gap-3.5 rounded-base border-2 border-border bg-secondary-background p-3.5 shadow-shadow">
               <NftImage src={chog.image} alt={chog.name} className="size-24 flex-none text-[11px]" />
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <div className="font-pixel text-lg font-bold">CHOG #{chog.tokenId}</div>
+                <div className="flex items-center gap-2 font-pixel text-lg font-bold">
+                  {chog.label}
+                  {chog.isTest && <span className="rounded-full bg-violet px-2 py-0.5 text-[10px] text-white">TEST</span>}
+                </div>
                 <div className="self-start rounded-full border-2 border-border bg-yellow px-2 py-0.5 font-pixel text-xs font-bold">
                   LV {chog.level} PARTY
                 </div>
@@ -85,7 +88,7 @@ export default function ChogSheet() {
 
             <section className="rounded-base border-2 border-border bg-secondary-background p-3 text-sm">
               <h2 className="mb-1 font-pixel text-xs font-bold">FOLLOWS THE CHOG</h2>
-              Everything here is recorded against Chog #{chog.tokenId}. If the Chog moves to a new wallet, its
+              Everything here is recorded against {chog.label}. If the Chog moves to a new wallet, its
               inventory goes with it.
               <a
                 href={explorerAddress(state.chronicle.address)}

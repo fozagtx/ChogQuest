@@ -14,7 +14,7 @@ import {
   type Hex,
 } from "viem"
 
-import { MONAD } from "@/lib/config"
+import { MONAD, TEST_CHOG } from "@/lib/config"
 
 // Browser helpers: API calls and the injected wallet (EIP-1193).
 
@@ -140,6 +140,39 @@ export async function claimOnChain(chronicle: Address, tokenId: number, day: num
       if (name && revertMessages[name]) throw new Error(revertMessages[name])
       if (/insufficient funds/i.test(err.message)) {
         throw new Error("This wallet needs a little MON on Monad for gas. A claim costs about 0.02 MON.")
+      }
+    }
+    throw err
+  }
+}
+
+const testChogAbi = parseAbi(["function mint() returns (uint256 tokenId)", "error MintLimitReached()"])
+
+/** Mints one free Test Chog to the connected wallet (gas only) and waits for it to land. */
+export async function mintTestChog(): Promise<Hex> {
+  const account = await connectWallet()
+  await switchToMonad()
+  const wallet = createWalletClient({ account, chain: monadChain, transport: custom(provider()) })
+  const reader = createPublicClient({ chain: monadChain, transport: http() })
+  try {
+    const { request } = await reader.simulateContract({
+      account,
+      address: TEST_CHOG.address,
+      abi: testChogAbi,
+      functionName: "mint",
+    })
+    const hash = await wallet.writeContract(request)
+    const receipt = await reader.waitForTransactionReceipt({ hash })
+    if (receipt.status !== "success") throw new Error("The mint transaction failed.")
+    return hash
+  } catch (err) {
+    if (err instanceof BaseError) {
+      const revert = err.walk((e) => e instanceof ContractFunctionRevertedError)
+      if (revert instanceof ContractFunctionRevertedError && revert.data?.errorName === "MintLimitReached") {
+        throw new Error(`Each wallet can mint up to ${TEST_CHOG.maxPerWallet} Test Chogs.`)
+      }
+      if (/insufficient funds/i.test(err.message)) {
+        throw new Error("This wallet needs a little MON on Monad for gas. Minting costs well under 0.05 MON.")
       }
     }
     throw err
