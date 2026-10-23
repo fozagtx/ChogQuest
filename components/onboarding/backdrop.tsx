@@ -18,7 +18,7 @@ const edge = [
 
 export function Backdrop({ mx, my }: { mx: MotionValue<number>; my: MotionValue<number> }) {
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-lvh overflow-hidden">
       <div className="absolute inset-x-0 top-0 h-[70%] bg-gradient-to-b from-main/30 via-main/10 to-transparent" />
       <ChogShader className="absolute inset-0" />
       <div className="pointer-events-auto hidden xl:block">

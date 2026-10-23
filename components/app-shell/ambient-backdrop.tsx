@@ -45,7 +45,7 @@ export function AmbientBackdrop() {
   const wide = useMediaQuery("(min-width: 1024px)")
 
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-cream">
+    <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-lvh overflow-hidden bg-cream">
       <div className="absolute inset-0 bg-[radial-gradient(120%_55%_at_50%_-8%,rgb(255_214_110/0.6),rgb(255_214_110/0.18)_45%,transparent_70%)]" />
       <div className="qc-drift-a absolute -top-10 -left-40 size-[420px] rounded-full bg-[radial-gradient(closest-side,rgb(139_108_255/0.30),rgb(139_108_255/0.12)_55%,transparent)]" />
       <div className="qc-drift-b absolute top-[45%] -right-44 size-[460px] rounded-full bg-[radial-gradient(closest-side,rgb(255_95_162/0.16),rgb(139_108_255/0.12)_55%,transparent)]" />

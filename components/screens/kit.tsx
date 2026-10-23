@@ -373,6 +373,7 @@ export function PillTabs<T extends string>({
             {active && (
               <motion.span
                 layoutId={`${id}-pill`}
+                layoutDependency={o.label}
                 className="absolute inset-0 rounded-full bg-main shadow-[0_8px_18px_-8px_rgb(255_184_0/0.8)]"
                 transition={bouncy}
               />

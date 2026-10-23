@@ -166,7 +166,7 @@ export default function Start() {
 
   return (
     <MotionRoot>
-      <div className="relative isolate flex min-h-dvh flex-col">
+      <div className="relative isolate flex min-h-svh flex-col">
         <Backdrop mx={mx} my={my} />
 
         <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col px-4 pt-4 pb-8 sm:px-6 lg:px-10 lg:pt-6">

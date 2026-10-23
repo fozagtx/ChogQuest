@@ -49,6 +49,9 @@ export function TabBar() {
               {active && (
                 <motion.span
                   layoutId="qc-tab-pill"
+                  // Only slide when the tab changes; re-measuring on every render inside the
+                  // sticky bar made the pill snap while scrolling.
+                  layoutDependency={tab.href}
                   transition={pill}
                   className="absolute inset-0 rounded-full bg-main shadow-[0_8px_18px_-8px_rgb(255_184_0/0.9)]"
                 />
