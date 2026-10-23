@@ -16,6 +16,9 @@ type TgMessage = { message_id: number; chat: { id: number; type: string }; from?
 type TgCallback = { id: string; from: TgUser; data?: string; message?: TgMessage }
 export type TgUpdate = { update_id: number; message?: TgMessage; callback_query?: TgCallback }
 
+/** The most recent failure while handling an update, for /api/telegram/status. */
+export const lastBotError: { message: string | null; at: string | null } = { message: null, at: null }
+
 /** Returns false when this update was already handled (Telegram retries). */
 export async function markUpdate(updateId: number) {
   const rows = await getDb()

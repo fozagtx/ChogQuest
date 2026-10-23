@@ -1,5 +1,5 @@
 import { handle, json, readJson } from "@/lib/api"
-import { handleUpdate, markUpdate, type TgUpdate } from "@/lib/bot"
+import { handleUpdate, lastBotError, markUpdate, type TgUpdate } from "@/lib/bot"
 import { safeEqual } from "@/lib/crypto"
 import { env } from "@/lib/env"
 
@@ -16,6 +16,8 @@ export const POST = handle(async (req: Request) => {
   } catch (err) {
     // Always 200 so Telegram does not retry forever; the update id is already recorded.
     console.error("telegram update failed", (err as Error).message)
+    lastBotError.message = (err as Error).message
+    lastBotError.at = new Date().toISOString()
   }
   return json({ ok: true })
 })
