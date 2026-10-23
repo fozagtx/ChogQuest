@@ -33,15 +33,15 @@ Built for Chogathon 2026.
 | --- | --- |
 | `app/` | Next.js 16 app: landing, `/start`, `/app` (Today, Quests, Chog, Share), `/link`, and all `/api/*` routes |
 | `lib/xp.ts`, `lib/night.ts`, `lib/items.ts` | Deterministic game rules: XP, levels, streak with weekly sleep-in, night rolls (about 1 in 12 nights has an EPIC item) |
-| `lib/narrate.ts` | The only AI call. It writes the diary title and text from the roll. It never decides numbers |
+| `lib/narrate.ts` | The only AI call (Nebius Token Factory). It writes the diary title and text from the roll. It never decides numbers |
 | `lib/game.ts` | Goals, check-ins, nights, claims, app state |
 | `lib/chain.ts` | Read-only chain access: Chog NFT (`ownerOf`, `tokenURI`), Chronicle's item roll, and claim verification |
 | `lib/bot.ts`, `app/api/telegram` | Telegram bot: link with `/start CODE`, then Claim and Mute buttons on the evening nudge |
 | `lib/cron.ts` | Evening job: one Telegram nudge per linked player when tonight's items are unclaimed |
-| `neon.ts`, `functions/scheduler.ts` | Neon backend: Postgres, AI Gateway, and the scheduler Function with its cron triggers |
+| `neon.ts`, `functions/scheduler.ts` | Neon backend: Postgres and the scheduler Function with its evening trigger |
 | `contracts/` | Foundry project with `Chronicle.sol`, 21 tests, deploy script |
 | `scripts/smoke.ts` | End-to-end check of the API with a real wallet key |
-| `lib/config.ts` | Public settings: Monad testnet RPC and explorer, Chog NFT and Chronicle addresses, Telegram bot username, AI model |
+| `lib/config.ts` | Public settings: Monad testnet RPC and explorer, Chog NFT and Chronicle addresses, Telegram bot username, Nebius endpoint and model |
 | `render.yaml` | Render Blueprint for the web service and its env group (secrets only) |
 
 ## Trust model
@@ -106,17 +106,17 @@ export DEPLOYER_PRIVATE_KEY=0x...      # only for deploying; the app never needs
 forge script script/Deploy.s.sol:Deploy --rpc-url monad_testnet --broadcast
 ```
 
-### 2. Neon (database, scheduler, AI Gateway)
+### 2. Neon (database and scheduler)
 
-`neon.ts` declares the backend on Neon: Lakebase Postgres, the AI Gateway for diary narration, and a `scheduler` Function with one Function Trigger (`0 19 * * *` UTC). The scheduler verifies each delivery came from Neon, then calls `APP_URL/api/cron/evening` with `x-cron-secret`. Diary pages are generated when a player opens the app, or by the evening job.
+`neon.ts` declares the backend on Neon: Lakebase Postgres and a `scheduler` Function with one Function Trigger (`0 19 * * *` UTC). The scheduler verifies each delivery came from Neon, then calls `APP_URL/api/cron/evening` with `x-cron-secret`. Diary pages are generated when a player opens the app, or by the evening job.
 
 ```bash
 neon login
-neon deploy --env .env.local     # provisions services, deploys the function, pulls DATABASE_URL and gateway vars
+neon deploy --env .env.local     # provisions services, deploys the function, pulls DATABASE_URL
 bun run db:migrate               # direct connection, derived from DATABASE_URL
 ```
 
-The app uses the pooled `DATABASE_URL` with `postgres.js` (prepared statements off for PgBouncer). AI narration is optional: with AI Gateway credits on the Neon org (or an `AI_API_KEY`) the diary is AI-written, otherwise the built-in template writes it.
+The app uses the pooled `DATABASE_URL` with `postgres.js` (prepared statements off for PgBouncer). AI narration is optional: with a `NEBIUS_API_KEY` the diary is written by `Qwen/Qwen3.5-397B-A17B` on Nebius Token Factory (endpoint and model in `lib/config.ts`), otherwise the built-in template writes it.
 
 ### 3. Render (web app)
 

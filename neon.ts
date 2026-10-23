@@ -3,8 +3,8 @@ import { defineConfig } from "@neon/config/v1";
 export default defineConfig({
   // Postgres comes with every branch. DATABASE_URL is pulled into .env.local.
   auth: false,
-  // Diary narration (lib/narrate.ts) calls models through the gateway.
-  aiGateway: true,
+  // Diary narration uses Nebius Token Factory (lib/config.ts), not the Neon AI Gateway.
+  aiGateway: false,
   functions: {
     // Calls the app's /api/cron/* endpoints on schedule (replaces separate cron services).
     scheduler: {

@@ -40,10 +40,8 @@ export const env = {
     return (optional("DEV_CHOG_NFT_ADDRESS") ?? CHOG_NFT.address) as `0x${string}`
   },
   chronicleAddress: () => (optional("DEV_CHRONICLE_ADDRESS") ?? CHRONICLE.address) as `0x${string}`,
-  // Neon AI Gateway (pulled by `neon deploy`). AI_API_KEY is a direct-Anthropic fallback.
-  aiGatewayUrl: () => optional("NEON_AI_GATEWAY_BASE_URL"),
-  aiGatewayToken: () => optional("NEON_AI_GATEWAY_TOKEN"),
-  aiApiKey: () => optional("AI_API_KEY"),
+  // Optional. Without it, diary pages use the built-in template.
+  nebiusApiKey: () => optional("NEBIUS_API_KEY"),
   telegramBotToken: () => optional("TELEGRAM_BOT_TOKEN"),
   // Telegram only accepts A-Z, a-z, 0-9, _ and - in the secret; scripts/set-webhook.ts strips the same way.
   telegramWebhookSecret: () => optional("TELEGRAM_WEBHOOK_SECRET")?.replace(/[^A-Za-z0-9_-]/g, ""),

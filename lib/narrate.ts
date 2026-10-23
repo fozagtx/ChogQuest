@@ -13,15 +13,13 @@ const TITLE_MAX = 48
 const DIARY_MAX = 420
 
 export async function narrateNight(tokenId: number, roll: NightRoll): Promise<Narration> {
-  const prompt = buildPrompt(tokenId, roll)
-  const gatewayUrl = env.aiGatewayUrl()
-  const gatewayToken = env.aiGatewayToken()
-  const anthropicKey = env.aiApiKey()
-  try {
-    if (gatewayUrl && gatewayToken) return parseNarration(await viaGateway(gatewayUrl, gatewayToken, prompt))
-    if (anthropicKey) return parseNarration(await viaAnthropic(anthropicKey, prompt))
-  } catch (err) {
-    console.error("narration failed, using fallback", (err as Error).message)
+  const key = env.nebiusApiKey()
+  if (key) {
+    try {
+      return parseNarration(await viaNebius(key, buildPrompt(tokenId, roll)))
+    } catch (err) {
+      console.error("narration failed, using fallback", (err as Error).message)
+    }
   }
   return fallbackNarration(roll)
 }
@@ -39,46 +37,31 @@ function buildPrompt(tokenId: number, roll: NightRoll) {
     .join("\n")
 }
 
-/** Neon AI Gateway, OpenAI-compatible chat completions on the unified /v1 route. */
-async function viaGateway(baseUrl: string, token: string, prompt: string) {
-  const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/v1/chat/completions`, {
+/** Nebius Token Factory, OpenAI-compatible chat completions. */
+async function viaNebius(key: string, prompt: string) {
+  const res = await fetch(`${AI.baseUrl}/chat/completions`, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model: AI.model,
-      max_tokens: 300,
-      messages: [{ role: "user", content: prompt }],
+      max_tokens: 400,
+      temperature: 0.9,
+      messages: [
+        { role: "system", content: "You write short, warm diary pages for a game. Reply with JSON only." },
+        { role: "user", content: prompt },
+      ],
     }),
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(30_000),
   })
-  if (!res.ok) throw new Error(`AI gateway ${res.status}`)
+  if (!res.ok) throw new Error(`Nebius ${res.status}`)
   const body = (await res.json()) as { choices?: { message?: { content?: string } }[] }
   return body.choices?.[0]?.message?.content ?? ""
 }
 
-/** Direct Anthropic fallback when no gateway is configured. */
-async function viaAnthropic(key: string, prompt: string) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: AI.model,
-      max_tokens: 300,
-      messages: [{ role: "user", content: prompt }],
-    }),
-    signal: AbortSignal.timeout(15_000),
-  })
-  if (!res.ok) throw new Error(`AI ${res.status}`)
-  const body = (await res.json()) as { content?: { type: string; text?: string }[] }
-  return body.content?.find((c) => c.type === "text")?.text ?? ""
-}
-
 function parseNarration(text: string): Narration {
-  const json = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as Partial<Narration>
+  // Reasoning models may think out loud first; keep only the final answer.
+  const answer = text.replace(/<think>[\s\S]*?<\/think>/g, "")
+  const json = JSON.parse(answer.slice(answer.indexOf("{"), answer.lastIndexOf("}") + 1)) as Partial<Narration>
   if (typeof json.title !== "string" || typeof json.diary !== "string") throw new Error("bad AI shape")
   return {
     title: json.title.toUpperCase().slice(0, TITLE_MAX),

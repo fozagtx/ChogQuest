@@ -27,8 +27,9 @@ export const TELEGRAM = {
 } as const
 
 export const AI = {
-  /** Model used for diary narration through the Neon AI Gateway (or Anthropic, with AI_API_KEY). */
-  model: "claude-haiku-5-5",
+  /** Diary narration runs on Nebius Token Factory (OpenAI-compatible). The key is NEBIUS_API_KEY. */
+  baseUrl: "https://api.tokenfactory.nebius.com/v1",
+  model: "Qwen/Qwen3.5-397B-A17B",
 } as const
 
 export function telegramBotUrl(startCode?: string) {
